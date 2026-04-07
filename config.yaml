@@ -1,0 +1,16 @@
+transcription:
+  model: "base"
+  device: "cpu"          # cpu, cuda, mps
+  language: "auto"       # auto = detect, или "en", "ru", etc.
+
+translation:
+  model: "llama3.2:3b"
+  ollama_url: "http://localhost:11434"
+
+tts:
+  model: "tts_models/multilingual/multi-dataset/xtts_v2"
+  language: "ru"
+  speaker_wav: null      # путь к WAV для клонирования голоса, или null
+
+output:
+  suffix: "_dubbed"
