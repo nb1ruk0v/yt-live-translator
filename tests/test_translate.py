@@ -1,3 +1,5 @@
+import pytest
+import requests
 from unittest.mock import patch, MagicMock
 from segment import Segment
 from translate import translate
@@ -69,3 +71,14 @@ def test_translate_returns_same_list(mock_post):
     result = translate(segments, FAKE_CONFIG)
 
     assert result is segments
+
+
+@patch("translate.requests.post")
+def test_translate_raises_on_http_error(mock_post):
+    mock_response = MagicMock()
+    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("500")
+    mock_post.return_value = mock_response
+
+    segments = [Segment(start=0.0, end=1.0, original="Test")]
+    with pytest.raises(requests.exceptions.HTTPError):
+        translate(segments, FAKE_CONFIG)
