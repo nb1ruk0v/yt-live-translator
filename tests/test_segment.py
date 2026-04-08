@@ -24,4 +24,4 @@ def test_segment_full():
 
 def test_segment_duration():
     seg = Segment(start=1.5, end=4.5, original="test")
-    assert seg.end - seg.start == 3.0
+    assert seg.duration == 3.0
