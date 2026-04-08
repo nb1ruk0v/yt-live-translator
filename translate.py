@@ -15,6 +15,7 @@ def translate(segments: list[Segment], config: dict) -> list[Segment]:
                 ),
                 "stream": False,
             },
+            timeout=60,
         )
         response.raise_for_status()
         seg.translated = response.json()["response"].strip()
