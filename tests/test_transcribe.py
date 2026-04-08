@@ -55,6 +55,11 @@ def test_transcribe_calls_ffmpeg(mock_run, mock_model_cls):
     call_args = mock_run.call_args[0][0]
     assert "ffmpeg" in call_args
     assert "my_video.mp4" in call_args
+    assert "-ac" in call_args
+    assert "1" in call_args
+    assert "-ar" in call_args
+    assert "16000" in call_args
+    assert "-vn" in call_args
 
 
 @patch("transcribe.WhisperModel")
