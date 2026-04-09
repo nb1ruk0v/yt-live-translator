@@ -17,6 +17,8 @@ def synthesize(segments: list[Segment], config: dict) -> list[Segment]:
         }
         if config.get("speaker_wav"):
             kwargs["speaker_wav"] = config["speaker_wav"]
+        elif config.get("speaker"):
+            kwargs["speaker"] = config["speaker"]
 
         tts.tts_to_file(**kwargs)
         seg.audio_path = out_path

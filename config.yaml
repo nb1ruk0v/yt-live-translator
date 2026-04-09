@@ -10,7 +10,8 @@ translation:
 tts:
   model: "tts_models/multilingual/multi-dataset/xtts_v2"
   language: "ru"
-  speaker_wav: null      # путь к WAV для клонирования голоса, или null
+  speaker: "Claribel Dervla"   # встроенный голос (игнорируется если задан speaker_wav)
+  speaker_wav: null            # путь к WAV для клонирования голоса, или null
 
 output:
   suffix: "_dubbed"
