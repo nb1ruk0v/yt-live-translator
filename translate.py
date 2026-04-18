@@ -76,6 +76,8 @@ def translate(segments: list[Segment], config: dict) -> list[Segment]:
             cleaned = seg.original
 
         seg.translated = cleaned
+        # On fallback, cleaned == seg.original (English); appending it keeps
+        # the model aware that the previous turn failed and lets it correct.
         history.append((seg.original, cleaned))
 
     return segments
