@@ -3,7 +3,7 @@ from pathlib import Path
 from segment import Segment
 
 
-ATEMPO_MAX = 1.15
+ATEMPO_MAX = 1.25
 
 
 def merge(video_path: str, segments: list[Segment], suffix: str) -> str:
