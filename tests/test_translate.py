@@ -16,6 +16,11 @@ class TestClean:
     def test_strips_guillemets(self):
         assert _clean("«Привет мир»") == "Привет мир"
 
+    def test_strips_stacked_quotes(self):
+        # current behavior: loop strips multiple layers in one call.
+        # pin this so Task 2 (which makes _clean load-bearing) can't drift silently.
+        assert _clean("'«Привет мир»'") == "Привет мир"
+
     def test_picks_first_cyrillic_line_after_prefix(self):
         raw = "Here's the translation:\nПривет мир"
         assert _clean(raw) == "Привет мир"
@@ -31,5 +36,9 @@ class TestClean:
         assert _clean("   \n  ") == ""
 
     def test_no_cyrillic_returns_stripped(self):
-        # no kyrillic → _clean just strips; caller handles fallback
+        # no cyrillic → _clean just strips; caller handles fallback
         assert _clean("  hello world  ") == "hello world"
+
+    def test_multiline_no_cyrillic_returns_stripped_full(self):
+        # dead branch otherwise; pin fallback behavior
+        assert _clean("  Hello\nWorld  ") == "Hello\nWorld"
