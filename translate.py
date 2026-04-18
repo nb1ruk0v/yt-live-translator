@@ -1,4 +1,5 @@
 import re
+import sys
 import requests
 from segment import Segment
 
@@ -32,6 +33,49 @@ def _clean(text: str) -> str:
     return text
 
 
+def _build_messages(
+    seg_original: str, history: list[tuple[str, str]]
+) -> list[dict]:
+    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    for orig, trans in history:
+        messages.append({"role": "user", "content": orig})
+        messages.append({"role": "assistant", "content": trans})
+    messages.append({"role": "user", "content": seg_original})
+    return messages
+
+
 def translate(segments: list[Segment], config: dict) -> list[Segment]:
-    # full implementation added in Task 2
-    raise NotImplementedError
+    history: list[tuple[str, str]] = []
+
+    for seg in segments:
+        if not seg.original.strip():
+            seg.translated = ""
+            continue
+
+        messages = _build_messages(seg.original, history[-CONTEXT_WINDOW:])
+        response = requests.post(
+            f"{config['ollama_url']}/api/chat",
+            json={
+                "model": config["model"],
+                "messages": messages,
+                "stream": False,
+                "options": {"temperature": 0},
+            },
+            timeout=120,
+        )
+        response.raise_for_status()
+        raw = response.json()["message"]["content"]
+        cleaned = _clean(raw)
+
+        if not cleaned or not CYRILLIC_RE.search(cleaned):
+            print(
+                f"[translate] warning: invalid LLM response for segment "
+                f"{seg.start:.2f}-{seg.end:.2f}, falling back to original",
+                file=sys.stderr,
+            )
+            cleaned = seg.original
+
+        seg.translated = cleaned
+        history.append((seg.original, cleaned))
+
+    return segments
