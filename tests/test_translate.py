@@ -193,6 +193,32 @@ def test_translate_empty_original_skipped(mock_post):
 
 
 @patch("translate.requests.post")
+def test_translate_empty_segments_not_added_to_history(mock_post):
+    responses = iter([
+        _mock_chat_response("Привет"),
+        _mock_chat_response("Пока"),
+    ])
+    mock_post.side_effect = lambda *a, **kw: next(responses)
+
+    segments = [
+        Segment(start=0, end=1, original="Hello"),
+        Segment(start=1, end=2, original=""),
+        Segment(start=2, end=3, original="   "),
+        Segment(start=3, end=4, original="Bye"),
+    ]
+    translate(segments, FAKE_CONFIG)
+
+    # Second call (for "Bye") should see history of exactly 1 pair (Hello/Привет),
+    # NOT the skipped empty segments.
+    last_msgs = mock_post.call_args_list[1][1]["json"]["messages"]
+    # system + 1 pair (user+assistant) + current user = 4
+    assert len(last_msgs) == 4
+    assert last_msgs[1] == {"role": "user", "content": "Hello"}
+    assert last_msgs[2] == {"role": "assistant", "content": "Привет"}
+    assert last_msgs[3] == {"role": "user", "content": "Bye"}
+
+
+@patch("translate.requests.post")
 def test_translate_falls_back_to_original_on_non_cyrillic_response(mock_post):
     mock_post.return_value = _mock_chat_response("I cannot translate this.")
     segments = [Segment(start=0, end=1, original="Mystery text")]
