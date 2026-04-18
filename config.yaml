@@ -3,6 +3,10 @@ transcription:
   device: "cpu"          # cpu, cuda, mps
   language: "auto"       # auto = detect, или "en", "ru", etc.
 
+grouping:
+  gap_threshold: 0.3     # сек — сегменты с gap меньше этого склеиваются
+  max_duration: 12.0     # сек — верхний предел длительности склеенного сегмента (Silero ~1000 chars)
+
 translation:
   model: "llama3.1:8b"
   ollama_url: "http://localhost:11434"

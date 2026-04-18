@@ -5,6 +5,7 @@ import requests
 from pathlib import Path
 
 from transcribe import transcribe
+from group import group_segments
 from translate import translate
 from tts import synthesize
 from merge import merge
@@ -50,6 +51,12 @@ def main() -> None:
     print("[1/4] Transcribing...")
     segments = transcribe(video_path, config["transcription"])
     print(f"      Found {len(segments)} segments")
+
+    grouping = config.get("grouping", {})
+    gap = grouping.get("gap_threshold", 0.3)
+    max_dur = grouping.get("max_duration", 12.0)
+    segments = group_segments(segments, gap_threshold=gap, max_duration=max_dur)
+    print(f"      Grouped into {len(segments)} (gap < {gap}s, max {max_dur}s)")
 
     print("[2/4] Translating...")
     segments = translate(segments, config["translation"])
