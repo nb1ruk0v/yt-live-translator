@@ -8,6 +8,7 @@ class Segment:
     original: str
     translated: str = field(default="")
     audio_path: str = field(default="")
+    audio_duration: float = field(default=0.0)
 
     @property
     def duration(self) -> float:
