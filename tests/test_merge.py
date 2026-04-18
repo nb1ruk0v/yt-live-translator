@@ -116,7 +116,7 @@ def test_merge_atempo_clamped_to_upper(mock_ffmpeg):
 
     atempo_calls = [c for c in chain.filter.call_args_list if c.args[0] == "atempo"]
     assert len(atempo_calls) == 1
-    assert abs(atempo_calls[0].args[1] - 1.15) < 1e-6
+    assert abs(atempo_calls[0].args[1] - 1.25) < 1e-6
 
 
 @patch("merge.ffmpeg")

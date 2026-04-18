@@ -8,10 +8,10 @@ translation:
   ollama_url: "http://localhost:11434"
 
 tts:
-  model: "tts_models/multilingual/multi-dataset/xtts_v2"
+  model: "v4_ru"         # Silero RU model bundle
   language: "ru"
-  speaker: "Claribel Dervla"   # встроенный голос (игнорируется если задан speaker_wav)
-  speaker_wav: null            # путь к WAV для клонирования голоса, или null
+  speaker: "eugene"      # aidar | eugene | baya | kseniya | xenia
+  sample_rate: 48000
 
 output:
   suffix: "_dubbed"

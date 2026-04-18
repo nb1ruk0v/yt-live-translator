@@ -2,11 +2,9 @@ import os
 import tempfile
 import wave
 import contextlib
-from TTS.api import TTS
+import numpy as np
+import torch
 from segment import Segment
-
-
-SPEED_MAX = 1.2
 
 
 def _wav_duration(path: str) -> float:
@@ -16,36 +14,43 @@ def _wav_duration(path: str) -> float:
         return frames / float(rate) if rate else 0.0
 
 
-def _synth(tts: TTS, config: dict, text: str, out_path: str, speed: float) -> None:
-    kwargs: dict = {
-        "text": text,
-        "language": config["language"],
-        "file_path": out_path,
-        "speed": speed,
-    }
-    if config.get("speaker_wav"):
-        kwargs["speaker_wav"] = config["speaker_wav"]
-    elif config.get("speaker"):
-        kwargs["speaker"] = config["speaker"]
-    tts.tts_to_file(**kwargs)
+def _save_wav(path: str, audio: torch.Tensor, sample_rate: int) -> None:
+    pcm = (audio.detach().cpu().numpy() * 32767).clip(-32768, 32767).astype(np.int16)
+    with contextlib.closing(wave.open(path, "wb")) as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(sample_rate)
+        w.writeframes(pcm.tobytes())
+
+
+def _load_model(config: dict):
+    model, _ = torch.hub.load(
+        repo_or_dir="snakers4/silero-models",
+        model="silero_tts",
+        language=config["language"],
+        speaker=config["model"],
+    )
+    return model
 
 
 def synthesize(segments: list[Segment], config: dict) -> list[Segment]:
-    tts = TTS(config["model"])
+    model = _load_model(config)
+    speaker = config["speaker"]
+    sample_rate = config.get("sample_rate", 48000)
 
     for i, seg in enumerate(segments):
         out_path = os.path.join(tempfile.gettempdir(), f"seg_{i:04d}.wav")
 
-        _synth(tts, config, seg.translated, out_path, speed=1.0)
-        dur = _wav_duration(out_path)
-
-        window = seg.duration
-        if window > 0 and dur > window:
-            speed = min(SPEED_MAX, dur / window)
-            _synth(tts, config, seg.translated, out_path, speed=speed)
-            dur = _wav_duration(out_path)
+        audio = model.apply_tts(
+            text=seg.translated,
+            speaker=speaker,
+            sample_rate=sample_rate,
+            put_accent=True,
+            put_yo=True,
+        )
+        _save_wav(out_path, audio, sample_rate)
 
         seg.audio_path = out_path
-        seg.audio_duration = dur
+        seg.audio_duration = _wav_duration(out_path)
 
     return segments
