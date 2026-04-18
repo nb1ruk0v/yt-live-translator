@@ -8,6 +8,7 @@ def test_segment_defaults():
     assert seg.original == "Hello world"
     assert seg.translated == ""
     assert seg.audio_path == ""
+    assert seg.audio_duration == 0.0
 
 
 def test_segment_full():
