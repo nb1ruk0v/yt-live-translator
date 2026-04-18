@@ -33,10 +33,20 @@ def _clean(text: str) -> str:
     return text
 
 
+def _build_system(target_chars: int) -> str:
+    return (
+        SYSTEM_PROMPT
+        + f" Keep the translation close to {target_chars} characters "
+        "(±20%). Prefer shorter wording; drop filler if needed."
+    )
+
+
 def _build_messages(
     seg_original: str, history: list[tuple[str, str]]
 ) -> list[dict]:
-    messages: list[dict] = [{"role": "system", "content": SYSTEM_PROMPT}]
+    messages: list[dict] = [
+        {"role": "system", "content": _build_system(len(seg_original))}
+    ]
     for orig, trans in history:
         messages.append({"role": "user", "content": orig})
         messages.append({"role": "assistant", "content": trans})

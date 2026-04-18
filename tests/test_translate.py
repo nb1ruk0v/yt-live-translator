@@ -239,6 +239,34 @@ def test_translate_falls_back_on_empty_response(mock_post):
 
 
 @patch("translate.requests.post")
+def test_system_prompt_includes_target_chars(mock_post):
+    mock_post.return_value = _mock_chat_response("Тест")
+    segments = [Segment(start=0.0, end=1.0, original="Hello world example")]  # 19 chars
+
+    translate(segments, FAKE_CONFIG)
+
+    system = mock_post.call_args[1]["json"]["messages"][0]["content"]
+    assert "19" in system
+
+
+@patch("translate.requests.post")
+def test_system_prompt_target_varies_per_segment(mock_post):
+    responses = iter([_mock_chat_response("А"), _mock_chat_response("Б")])
+    mock_post.side_effect = lambda *a, **kw: next(responses)
+
+    segments = [
+        Segment(start=0.0, end=1.0, original="Hi there"),       # 8 chars
+        Segment(start=1.0, end=2.0, original="Hello to you!"),  # 13 chars
+    ]
+    translate(segments, FAKE_CONFIG)
+
+    sys1 = mock_post.call_args_list[0][1]["json"]["messages"][0]["content"]
+    sys2 = mock_post.call_args_list[1][1]["json"]["messages"][0]["content"]
+    assert "8" in sys1
+    assert "13" in sys2
+
+
+@patch("translate.requests.post")
 def test_translate_returns_same_list(mock_post):
     mock_post.return_value = _mock_chat_response("Привет")
     segments = [Segment(start=0.0, end=2.0, original="Hello")]
