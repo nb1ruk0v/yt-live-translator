@@ -1,5 +1,9 @@
 # Context-Aware Translation — Design
 
+> **Status (2026-04-24):** Реализовано в `translate.py`. Отклонения от этого дизайна:
+> - **Unit-тесты есть** — `tests/test_translate.py` покрывает `_clean`, history, fallback, endpoint/payload (21 тест). Секция «Тестирование» ниже фиксировала намерение на момент написания спеки.
+> - **Length-aware hint** добавлен сверху: `_build_system(target_chars)` расширяет system-prompt строкой `Keep the translation close to N characters (±20%)`. Цель — давить LLM на компактный перевод, чтобы `merge.py` не упирался в `ATEMPO_MAX=1.25`. Не был частью исходной спеки.
+
 ## Проблема
 
 Сейчас `translate.py` переводит каждый Whisper-сегмент изолированно, через `/api/generate`, с минималистичным промптом и без параметров сэмплирования. Это порождает три класса дефектов качества:

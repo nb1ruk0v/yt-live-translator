@@ -1,5 +1,7 @@
 # Context-Aware Translation Implementation Plan
 
+> **Status (2026-04-24):** Реализовано. Task 1 — коммит `c403d32`, Task 2 — коммит `292e151` (+ регрессионные тесты в `dc4a12f`), Task 3 — smoke-test пройден. Чекбоксы ниже отражают фактическое состояние кода.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Rewrite `translate.py` to translate Whisper segments via Ollama `/api/chat` with sliding-window history (N=3), deterministic sampling, and response post-processing.
@@ -26,7 +28,7 @@ Spec: `docs/superpowers/specs/2026-04-18-context-aware-translation-design.md`.
 - Modify: `translate.py`
 - Test: `tests/test_translate.py`
 
-- [ ] **Step 1: Replace test file with `_clean` tests first**
+- [x] **Step 1: Replace test file with `_clean` tests first**
 
 Overwrite `tests/test_translate.py` with this starting content (existing tests will be re-added in later tasks):
 
@@ -68,12 +70,12 @@ class TestClean:
         assert _clean("  hello world  ") == "hello world"
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `uv run pytest tests/test_translate.py -v`
 Expected: ImportError / AttributeError — `_clean` not defined.
 
-- [ ] **Step 3: Implement `_clean` in `translate.py`**
+- [x] **Step 3: Implement `_clean` in `translate.py`**
 
 Overwrite `translate.py` with:
 
@@ -117,12 +119,12 @@ def translate(segments: list[Segment], config: dict) -> list[Segment]:
     raise NotImplementedError
 ```
 
-- [ ] **Step 4: Run `_clean` tests to verify they pass**
+- [x] **Step 4: Run `_clean` tests to verify they pass**
 
 Run: `uv run pytest tests/test_translate.py -v -k TestClean`
 Expected: all 8 TestClean tests PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add translate.py tests/test_translate.py
@@ -137,7 +139,7 @@ git commit -m "feat(translate): add _clean post-processor with tests"
 - Modify: `translate.py`
 - Test: `tests/test_translate.py`
 
-- [ ] **Step 1: Append integration tests for `translate` to `tests/test_translate.py`**
+- [x] **Step 1: Append integration tests for `translate` to `tests/test_translate.py`**
 
 Append these tests (to the end of the existing file, outside `TestClean`):
 
@@ -331,12 +333,12 @@ def test_translate_raises_on_http_error(mock_post):
         translate(segments, FAKE_CONFIG)
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `uv run pytest tests/test_translate.py -v`
 Expected: TestClean tests still pass; all new tests FAIL with `NotImplementedError`.
 
-- [ ] **Step 3: Replace `translate` body with real implementation**
+- [x] **Step 3: Replace `translate` body with real implementation**
 
 In `translate.py`, replace the `translate` function (keep imports, constants, and `_clean` untouched):
 
@@ -394,12 +396,12 @@ def translate(segments: list[Segment], config: dict) -> list[Segment]:
 
 Note: move `import sys` to the top of the file with the other imports.
 
-- [ ] **Step 4: Run full test file to verify all tests pass**
+- [x] **Step 4: Run full test file to verify all tests pass**
 
 Run: `uv run pytest tests/test_translate.py -v`
 Expected: all tests PASS (8 TestClean + 13 translate tests = 21 total).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add translate.py tests/test_translate.py
@@ -412,22 +414,22 @@ git commit -m "feat(translate): context-aware chat with N=3 history and fallback
 
 **Files:** none modified.
 
-- [ ] **Step 1: Verify Ollama is running**
+- [x] **Step 1: Verify Ollama is running**
 
 Run: `curl -s http://localhost:11434/api/tags | head -c 200`
 Expected: JSON with models list. If fails → user must run `ollama serve`; stop and report.
 
-- [ ] **Step 2: Run full pipeline on test video**
+- [x] **Step 2: Run full pipeline on test video**
 
 Run: `uv run dub.py data/test_video.mp4`
 Expected: prints `[1/4]` through `[4/4]` without errors, final message `Done! Output saved to: data/test_video_dubbed.mp4`.
 
-- [ ] **Step 3: Verify output file exists**
+- [x] **Step 3: Verify output file exists**
 
 Run: `ls -la data/test_video_dubbed.mp4`
 Expected: file exists, size > 0.
 
-- [ ] **Step 4: Report qualitative check to user**
+- [x] **Step 4: Report qualitative check to user**
 
 Report: pipeline ran end-to-end. Ask user to watch the dubbed video and compare translation quality against previous runs (especially pronoun/term consistency across adjacent segments). Do NOT claim quality improvement without user confirmation — we only verified non-crash, not translation quality.
 
