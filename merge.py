@@ -1,7 +1,8 @@
-import ffmpeg
 from pathlib import Path
-from segment import Segment
 
+import ffmpeg
+
+from segment import Segment
 
 ATEMPO_MAX = 1.25
 
@@ -44,9 +45,7 @@ def merge(video_path: str, segments: list[Segment], suffix: str) -> str:
         )
 
     if audio_streams:
-        mixed = ffmpeg.filter(
-            audio_streams, "amix", inputs=len(audio_streams), normalize=0
-        )
+        mixed = ffmpeg.filter(audio_streams, "amix", inputs=len(audio_streams), normalize=0)
         out = ffmpeg.output(video, mixed, str(output_path))
     else:
         out = ffmpeg.output(video, str(output_path))

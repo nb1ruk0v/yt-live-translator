@@ -1,8 +1,10 @@
+from unittest.mock import MagicMock, patch
+
 import pytest
 import requests
-from unittest.mock import patch, MagicMock
+
 from segment import Segment
-from translate import translate, _clean
+from translate import _clean, translate
 
 
 class TestClean:
@@ -131,13 +133,15 @@ def test_translate_disables_stream(mock_post):
 @patch("translate.requests.post")
 def test_translate_includes_recent_history_up_to_n3(mock_post):
     # returns unique responses so we can inspect history
-    responses = iter([
-        _mock_chat_response("Один"),
-        _mock_chat_response("Два"),
-        _mock_chat_response("Три"),
-        _mock_chat_response("Четыре"),
-        _mock_chat_response("Пять"),
-    ])
+    responses = iter(
+        [
+            _mock_chat_response("Один"),
+            _mock_chat_response("Два"),
+            _mock_chat_response("Три"),
+            _mock_chat_response("Четыре"),
+            _mock_chat_response("Пять"),
+        ]
+    )
     mock_post.side_effect = lambda *a, **kw: next(responses)
 
     segments = [
@@ -194,10 +198,12 @@ def test_translate_empty_original_skipped(mock_post):
 
 @patch("translate.requests.post")
 def test_translate_empty_segments_not_added_to_history(mock_post):
-    responses = iter([
-        _mock_chat_response("Привет"),
-        _mock_chat_response("Пока"),
-    ])
+    responses = iter(
+        [
+            _mock_chat_response("Привет"),
+            _mock_chat_response("Пока"),
+        ]
+    )
     mock_post.side_effect = lambda *a, **kw: next(responses)
 
     segments = [
@@ -255,7 +261,7 @@ def test_system_prompt_target_varies_per_segment(mock_post):
     mock_post.side_effect = lambda *a, **kw: next(responses)
 
     segments = [
-        Segment(start=0.0, end=1.0, original="Hi there"),       # 8 chars
+        Segment(start=0.0, end=1.0, original="Hi there"),  # 8 chars
         Segment(start=1.0, end=2.0, original="Hello to you!"),  # 13 chars
     ]
     translate(segments, FAKE_CONFIG)
