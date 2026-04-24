@@ -1,15 +1,16 @@
-import sys
-import yaml
 import subprocess
-import requests
+import sys
 from pathlib import Path
 from urllib.parse import urlparse
 
-from transcribe import transcribe
+import requests
+import yaml
+
 from group import group_segments
+from merge import merge
+from transcribe import transcribe
 from translate import translate
 from tts import synthesize
-from merge import merge
 
 
 def load_config(path: str = "config.yaml") -> dict:
@@ -23,14 +24,11 @@ def check_prerequisites(config: dict) -> None:
         raise RuntimeError("ffmpeg not found. Install with: brew install ffmpeg")
 
     try:
-        r = requests.get(
-            f"{config['translation']['ollama_url']}/api/tags", timeout=3
-        )
+        r = requests.get(f"{config['translation']['ollama_url']}/api/tags", timeout=3)
         r.raise_for_status()
     except Exception as e:
         raise RuntimeError(
-            f"Ollama not reachable at {config['translation']['ollama_url']}. "
-            "Run: ollama serve"
+            f"Ollama not reachable at {config['translation']['ollama_url']}. Run: ollama serve"
         ) from e
 
 
@@ -49,15 +47,21 @@ def download_video(url: str, out_dir: str = "data") -> str:
     result = subprocess.run(
         [
             "yt-dlp",
-            "-f", "bv*+ba/b",
-            "-S", "res:720",
-            "--merge-output-format", "mp4",
-            "--print", "after_move:filepath",
+            "-f",
+            "bv*+ba/b",
+            "-S",
+            "res:720",
+            "--merge-output-format",
+            "mp4",
+            "--print",
+            "after_move:filepath",
             "--no-simulate",
-            "-o", template,
+            "-o",
+            template,
             url,
         ],
-        capture_output=True, text=True,
+        capture_output=True,
+        text=True,
     )
     if result.returncode != 0:
         raise RuntimeError(f"yt-dlp failed:\n{result.stderr}")

@@ -1,7 +1,7 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from segment import Segment
 from tts import synthesize
-
 
 FAKE_CONFIG = {
     "model": "v4_ru",

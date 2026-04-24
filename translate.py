@@ -1,6 +1,8 @@
 import re
 import sys
+
 import requests
+
 from segment import Segment
 
 SYSTEM_PROMPT = (
@@ -22,7 +24,7 @@ def _clean(text: str) -> str:
     # strip matching outer quotes (ascii + guillemets)
     for q_open, q_close in (('"', '"'), ("'", "'"), ("«", "»")):
         if text.startswith(q_open) and text.endswith(q_close) and len(text) >= 2:
-            text = text[len(q_open):-len(q_close)].strip()
+            text = text[len(q_open) : -len(q_close)].strip()
     # if multi-line, pick first non-empty line that contains cyrillic
     if "\n" in text:
         for line in (ln.strip() for ln in text.split("\n")):
@@ -35,18 +37,13 @@ def _clean(text: str) -> str:
 
 def _build_system(target_chars: int) -> str:
     return (
-        SYSTEM_PROMPT
-        + f" Keep the translation close to {target_chars} characters "
+        SYSTEM_PROMPT + f" Keep the translation close to {target_chars} characters "
         "(±20%). Prefer shorter wording; drop filler if needed."
     )
 
 
-def _build_messages(
-    seg_original: str, history: list[tuple[str, str]]
-) -> list[dict]:
-    messages: list[dict] = [
-        {"role": "system", "content": _build_system(len(seg_original))}
-    ]
+def _build_messages(seg_original: str, history: list[tuple[str, str]]) -> list[dict]:
+    messages: list[dict] = [{"role": "system", "content": _build_system(len(seg_original))}]
     for orig, trans in history:
         messages.append({"role": "user", "content": orig})
         messages.append({"role": "assistant", "content": trans})

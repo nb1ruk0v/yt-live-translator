@@ -1,19 +1,26 @@
-from unittest.mock import patch, MagicMock
-from segment import Segment
+from unittest.mock import MagicMock, patch
+
 from merge import merge
+from segment import Segment
 
 
 def make_segments():
     return [
         Segment(
-            start=0.0, end=2.0,
-            original="Hi", translated="Привет",
-            audio_path="/tmp/seg_0000.wav", audio_duration=1.8,
+            start=0.0,
+            end=2.0,
+            original="Hi",
+            translated="Привет",
+            audio_path="/tmp/seg_0000.wav",
+            audio_duration=1.8,
         ),
         Segment(
-            start=3.0, end=5.0,
-            original="Bye", translated="Пока",
-            audio_path="/tmp/seg_0001.wav", audio_duration=1.5,
+            start=3.0,
+            end=5.0,
+            original="Bye",
+            translated="Пока",
+            audio_path="/tmp/seg_0001.wav",
+            audio_duration=1.5,
         ),
     ]
 
@@ -77,11 +84,16 @@ def test_merge_no_atempo_when_audio_fits(mock_ffmpeg):
 @patch("merge.ffmpeg")
 def test_merge_atrim_caps_when_stretched(mock_ffmpeg):
     chain = _setup(mock_ffmpeg)
-    segs = [Segment(
-        start=0.0, end=2.0,
-        original="Hi", translated="Привет",
-        audio_path="/tmp/x.wav", audio_duration=3.0,
-    )]
+    segs = [
+        Segment(
+            start=0.0,
+            end=2.0,
+            original="Hi",
+            translated="Привет",
+            audio_path="/tmp/x.wav",
+            audio_duration=3.0,
+        )
+    ]
     merge("/videos/test.mp4", segs, "_dubbed")
 
     atrim_calls = [c for c in chain.filter.call_args_list if c.args[0] == "atrim"]
@@ -92,11 +104,16 @@ def test_merge_atrim_caps_when_stretched(mock_ffmpeg):
 @patch("merge.ffmpeg")
 def test_merge_atempo_when_audio_too_long(mock_ffmpeg):
     chain = _setup(mock_ffmpeg)
-    segs = [Segment(
-        start=0.0, end=2.0,
-        original="Hi", translated="Привет",
-        audio_path="/tmp/x.wav", audio_duration=2.2,
-    )]
+    segs = [
+        Segment(
+            start=0.0,
+            end=2.0,
+            original="Hi",
+            translated="Привет",
+            audio_path="/tmp/x.wav",
+            audio_duration=2.2,
+        )
+    ]
     merge("/videos/test.mp4", segs, "_dubbed")
 
     atempo_calls = [c for c in chain.filter.call_args_list if c.args[0] == "atempo"]
@@ -107,11 +124,16 @@ def test_merge_atempo_when_audio_too_long(mock_ffmpeg):
 @patch("merge.ffmpeg")
 def test_merge_atempo_clamped_to_upper(mock_ffmpeg):
     chain = _setup(mock_ffmpeg)
-    segs = [Segment(
-        start=0.0, end=2.0,
-        original="Hi", translated="Привет",
-        audio_path="/tmp/x.wav", audio_duration=3.0,
-    )]
+    segs = [
+        Segment(
+            start=0.0,
+            end=2.0,
+            original="Hi",
+            translated="Привет",
+            audio_path="/tmp/x.wav",
+            audio_duration=3.0,
+        )
+    ]
     merge("/videos/test.mp4", segs, "_dubbed")
 
     atempo_calls = [c for c in chain.filter.call_args_list if c.args[0] == "atempo"]

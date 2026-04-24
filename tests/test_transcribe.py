@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
+
 from segment import Segment
 from transcribe import transcribe
-
 
 FAKE_CONFIG = {
     "model": "base",

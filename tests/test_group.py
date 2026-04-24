@@ -1,5 +1,5 @@
-from segment import Segment
 from group import group_segments
+from segment import Segment
 
 
 def test_group_empty():

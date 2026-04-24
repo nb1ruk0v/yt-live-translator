@@ -1,9 +1,11 @@
+import contextlib
 import os
 import tempfile
 import wave
-import contextlib
+
 import numpy as np
 import torch
+
 from segment import Segment
 
 
