@@ -1,106 +1,106 @@
 # vt-claude — Video Translation & Dubbing
 
-Пайплайн автоматического дубляжа видео: транскрипция → группировка → перевод → синтез речи → сборка.
+Automatic video dubbing pipeline: transcription → grouping → translation → speech synthesis → mux.
 
-## Быстрый старт
+## Quick start
 
 ```bash
-# локальный файл
-uv run dub.py data/test_video.mp4
+# local file
+uv run src/dub.py data/test_video.mp4
 
-# или URL (YouTube и пр., через yt-dlp)
-uv run dub.py "https://www.youtube.com/watch?v=..."
+# or URL (YouTube etc., via yt-dlp)
+uv run src/dub.py "https://www.youtube.com/watch?v=..."
 ```
 
-Результат сохраняется рядом с исходником с суффиксом `_dubbed`:
-`data/test_video_dubbed.mp4`. Для URL видео сначала скачивается в `data/`.
+The output is written next to the source with a `_dubbed` suffix:
+`data/test_video_dubbed.mp4`. For URL inputs the video is first downloaded into `data/`.
 
-## Установка
+## Installation
 
-**Требования:** Python 3.11, [uv](https://github.com/astral-sh/uv), ffmpeg,
-[Ollama](https://ollama.ai). Для URL-входа дополнительно `yt-dlp`.
+**Requirements:** Python 3.11, [uv](https://github.com/astral-sh/uv), ffmpeg,
+[Ollama](https://ollama.ai). For URL inputs, additionally `yt-dlp`.
 
 ```bash
-# зависимости
+# dependencies
 uv sync
 
-# системные утилиты
+# system tools
 brew install ffmpeg
-brew install yt-dlp      # только если планируешь скачивать по URL
+brew install yt-dlp      # only if you plan to feed URLs
 
-# LLM для перевода
+# LLM for translation
 ollama pull llama3.1:8b
 ollama serve
 ```
 
-Первый запуск дополнительно скачает Silero-модель (~60 MB) в кеш `torch.hub`.
+The first run will additionally download the Silero model (~60 MB) into the `torch.hub` cache.
 
-## Пайплайн
+## Pipeline
 
 ```
 video.mp4 / URL
     │
     ▼
-[1] transcribe.py   faster-whisper      текст + тайминги (Segment.original)
+[1] src/transcribe.py   faster-whisper      text + timings (Segment.original)
     │
     ▼
-    group.py        слияние по gap      короткие сегменты склеиваются
-    │                                   (max_duration-cap)
+    src/group.py        gap-based merge     short segments are merged
+    │                                       (with max_duration cap)
     ▼
-[2] translate.py    Ollama /api/chat    перевод на RU с N=3 history
-    │                                   (Segment.translated)
+[2] src/translate.py    Ollama /api/chat    translation to RU with N=3 history
+    │                                       (Segment.translated)
     ▼
-[3] tts.py          Silero (v4_ru)      WAV на сегмент
-    │                                   (Segment.audio_path/audio_duration)
+[3] src/tts.py          Silero (v4_ru)      one WAV per segment
+    │                                       (Segment.audio_path/audio_duration)
     ▼
-[4] merge.py        ffmpeg-python       atempo-стрейч + atrim-cap,
-                                        amix поверх видео
+[4] src/merge.py        ffmpeg-python       atempo stretch + atrim cap,
+                                            amix on top of the video
     ▼
 video_dubbed.mp4
 ```
 
-Центральный объект — `Segment` (`segment.py`): `start`, `end`, `original`,
+The central object is `Segment` (`src/segment.py`): `start`, `end`, `original`,
 `translated`, `audio_path`, `audio_duration`.
 
-## Синхронизация дубляжа
+## Dubbing synchronization
 
-Русский перевод обычно на 20–50% длиннее оригинала, поэтому:
+Russian translation is typically 20–50% longer than the original, so:
 
-1. **`translate.py`** — в system-prompt подаётся length hint (`Keep the
-   translation close to N characters`), чтобы LLM сам не раздувал длину.
-2. **`tts.py`** — Silero синтезирует WAV, реальная длительность пишется в
+1. **`src/translate.py`** — a length hint is added to the system prompt
+   (`Keep the translation close to N characters`) so the LLM does not inflate the length itself.
+2. **`src/tts.py`** — Silero synthesizes a WAV; the actual duration is written into
    `Segment.audio_duration`.
-3. **`merge.py`** — если `audio_duration > seg.duration`:
-   - `atempo` с ratio, клэмп `ATEMPO_MAX = 1.25` (сохраняет pitch,
-     ускоряет речь);
-   - `atrim(duration=seg.duration)` как safety cap — без него хвост
-     переливается в следующее окно и микшируется `amix` как «второй голос».
-4. Если `audio_duration ≤ seg.duration` — фильтры не применяются,
-   остаток окна остаётся тишиной.
+3. **`src/merge.py`** — if `audio_duration > seg.duration`:
+   - `atempo` with the corresponding ratio, clamped at `ATEMPO_MAX = 1.25`
+     (preserves pitch, speeds up the speech);
+   - `atrim(duration=seg.duration)` as a safety cap — without it the tail bleeds
+     into the next window and gets mixed by `amix` as a "second voice".
+4. If `audio_duration ≤ seg.duration` — no filters are applied,
+   the rest of the window stays silent.
 
-`merge.py` печатает per-segment диагностику (`atempo=…, truncated …s`)
-и итоговую строку сколько сегментов стрейчилось.
+`src/merge.py` prints per-segment diagnostics (`atempo=…, truncated …s`)
+and a final line indicating how many segments were stretched.
 
-## Конфигурация
+## Configuration
 
-Все параметры в `config.yaml`:
+All parameters live in `config.yaml`:
 
 ```yaml
 transcription:
   model: "base"          # tiny / base / small / medium / large
   device: "cpu"          # cpu | cuda | mps
-  language: "auto"       # auto = определить автоматически, или "en", "ru" и т.д.
+  language: "auto"       # auto = autodetect, or "en", "ru", etc.
 
 grouping:
-  gap_threshold: 0.3     # сек — сегменты с gap меньше этого склеиваются
-  max_duration: 12.0     # сек — верхний предел длительности склейки
+  gap_threshold: 0.3     # seconds — segments with a smaller gap are merged
+  max_duration: 12.0     # seconds — upper bound on merged segment duration
 
 translation:
   model: "llama3.1:8b"
   ollama_url: "http://localhost:11434"
 
 tts:
-  model: "v4_ru"         # Silero RU-бандл
+  model: "v4_ru"         # Silero RU bundle
   language: "ru"
   speaker: "eugene"      # aidar | eugene | baya | kseniya | xenia
   sample_rate: 48000
@@ -109,25 +109,25 @@ output:
   suffix: "_dubbed"
 ```
 
-**Смена голоса:** поменять `speaker` в `config.yaml`. Клонирование голоса
-Silero не поддерживает — если нужно, смотреть в сторону F5-TTS / XTTS.
+**Changing the voice:** swap `speaker` in `config.yaml`. Silero does not support
+voice cloning — if you need that, look at F5-TTS / XTTS.
 
-## Стек
+## Stack
 
-| Компонент | Инструмент | Назначение |
+| Component | Tool | Purpose |
 |---|---|---|
-| Транскрипция | faster-whisper | Whisper, CPU, `int8` |
-| Группировка | `group.py` | Склейка коротких Whisper-сегментов по `gap_threshold`, cap по `max_duration` |
-| Перевод | Ollama (`/api/chat`, `llama3.1:8b`) | Sliding-window history N=3, `temperature=0`, length hint |
-| Синтез речи | Silero TTS (`v4_ru`) | RU, подгружается через `torch.hub` из `snakers4/silero-models` |
-| Сборка | ffmpeg / ffmpeg-python | Извлечение аудио, atempo-стрейч, amix |
-| Загрузка URL | yt-dlp | Опционально — если вход является http(s)-ссылкой |
+| Transcription | faster-whisper | Whisper, CPU, `int8` |
+| Grouping | `src/group.py` | Merges short Whisper segments by `gap_threshold`, capped by `max_duration` |
+| Translation | Ollama (`/api/chat`, `llama3.1:8b`) | Sliding-window history N=3, `temperature=0`, length hint |
+| Speech synthesis | Silero TTS (`v4_ru`) | RU, loaded via `torch.hub` from `snakers4/silero-models` |
+| Mux | ffmpeg / ffmpeg-python | Audio extraction, atempo stretch, amix |
+| URL download | yt-dlp | Optional — only when the input is an http(s) URL |
 
-## Тесты
+## Tests
 
 ```bash
 uv run pytest
 ```
 
-Юнит-тесты покрывают `translate` (включая `_clean`, history, fallback),
+Unit tests cover `translate` (including `_clean`, history, fallback),
 `group`, `merge`, `tts`, `transcribe`, `dub`, `segment`.

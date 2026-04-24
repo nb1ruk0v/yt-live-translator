@@ -5,11 +5,11 @@
 ## Запуск
 
 ```bash
-uv run dub.py <video_file_or_url>
+uv run src/dub.py <video_file_or_url>
 # локальный файл:
-uv run dub.py data/test_video.mp4
+uv run src/dub.py data/test_video.mp4
 # URL (через yt-dlp, сохраняется в data/):
-uv run dub.py "https://www.youtube.com/watch?v=..."
+uv run src/dub.py "https://www.youtube.com/watch?v=..."
 ```
 
 Результат сохраняется рядом с исходником: `test_video_dubbed.mp4`.
@@ -20,24 +20,24 @@ uv run dub.py "https://www.youtube.com/watch?v=..."
 video.mp4 / URL
     │
     ▼
-[1] transcribe.py   faster-whisper      извлекает текст + тайминги (Segment.original)
+[1] src/transcribe.py   faster-whisper      извлекает текст + тайминги (Segment.original)
     │
     ▼
-    group.py        склейка коротких сегментов по gap_threshold (с max_duration cap)
+    src/group.py        склейка коротких сегментов по gap_threshold (с max_duration cap)
     │
     ▼
-[2] translate.py    Ollama /api/chat    перевод на RU с N=3 history + length hint (Segment.translated)
+[2] src/translate.py    Ollama /api/chat    перевод на RU с N=3 history + length hint (Segment.translated)
     │
     ▼
-[3] tts.py          Silero TTS (v4_ru)  синтезирует WAV для каждого сегмента (Segment.audio_path/audio_duration)
+[3] src/tts.py          Silero TTS (v4_ru)  синтезирует WAV для каждого сегмента (Segment.audio_path/audio_duration)
     │
     ▼
-[4] merge.py        ffmpeg-python       atempo-стрейч + atrim-cap, amix поверх видео
+[4] src/merge.py        ffmpeg-python       atempo-стрейч + atrim-cap, amix поверх видео
 ```
 
-Центральный объект — `Segment` (`segment.py`): `start`, `end`, `original`, `translated`, `audio_path`, `audio_duration`.
+Центральный объект — `Segment` (`src/segment.py`): `start`, `end`, `original`, `translated`, `audio_path`, `audio_duration`.
 
-URL-вход детектируется `is_url` в `dub.py` и качается через `yt-dlp` (требуется в PATH).
+URL-вход детектируется `is_url` в `src/dub.py` и качается через `yt-dlp` (требуется в PATH).
 
 ## Зависимости и инфраструктура
 
@@ -47,7 +47,7 @@ URL-вход детектируется `is_url` в `dub.py` и качается
 | **Ollama** (`llama3.1:8b`) | Локальный LLM для перевода, должен быть запущен (`ollama serve`) |
 | **Silero TTS** (`v4_ru`) | Синтез речи на RU, подгружается через `torch.hub` из `snakers4/silero-models` |
 | **ffmpeg** | Извлечение аудио и сборка финального видео, должен быть в PATH |
-| **ffmpeg-python** | Python-обёртка над ffmpeg для `merge.py` |
+| **ffmpeg-python** | Python-обёртка над ffmpeg для `src/merge.py` |
 | **yt-dlp** | Опционально — скачивание видео, если вход является http(s)-URL |
 
 ## Конфигурация (`config.yaml`)
@@ -82,9 +82,9 @@ output:
 
 Рус-перевод обычно на 20–50% длиннее оригинала, поэтому:
 
-1. **`translate.py`** — в system-prompt подаётся length hint (`Keep the translation close to N characters ±20%`), чтобы LLM сам не раздувал длину.
-2. **`tts.py`** — Silero синтезирует WAV, в `Segment.audio_duration` кладётся реальная длительность.
-3. **`merge.py`** — если `audio_duration > seg.duration`:
+1. **`src/translate.py`** — в system-prompt подаётся length hint (`Keep the translation close to N characters ±20%`), чтобы LLM сам не раздувал длину.
+2. **`src/tts.py`** — Silero синтезирует WAV, в `Segment.audio_duration` кладётся реальная длительность.
+3. **`src/merge.py`** — если `audio_duration > seg.duration`:
    - `atempo` с ratio, клэмп `ATEMPO_MAX = 1.25` (сохраняет pitch, ускоряет речь);
    - `atrim(duration=seg.duration)` как safety cap, чтобы хвост не переливался в следующий сегмент (иначе `amix` микширует его как «второй голос»);
    - печатает per-segment диагностику + итоговую строку сколько сегментов стрейчилось.
@@ -92,7 +92,7 @@ output:
 
 ## Контекст перевода
 
-`translate.py` обращается к Ollama через `/api/chat` с sliding-window history N=3 (локальная переменная функции, между запусками не сохраняется) и `temperature=0`. Постобработка ответа (`_clean`): trim пробелов и кавычек (`"`, `'`, `«`, `»`), при многострочном ответе — первая строка с кириллицей. Пустой оригинал → `translated = ""` без вызова. Невалидный ответ LLM (нет кириллицы) → фолбэк `translated = original` + предупреждение в stderr (пайплайн не роняется).
+`src/translate.py` обращается к Ollama через `/api/chat` с sliding-window history N=3 (локальная переменная функции, между запусками не сохраняется) и `temperature=0`. Постобработка ответа (`_clean`): trim пробелов и кавычек (`"`, `'`, `«`, `»`), при многострочном ответе — первая строка с кириллицей. Пустой оригинал → `translated = ""` без вызова. Невалидный ответ LLM (нет кириллицы) → фолбэк `translated = original` + предупреждение в stderr (пайплайн не роняется).
 
 ## Установка
 
