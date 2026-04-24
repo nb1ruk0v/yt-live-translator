@@ -3,6 +3,7 @@ import yaml
 import subprocess
 import requests
 from pathlib import Path
+from urllib.parse import urlparse
 
 from transcribe import transcribe
 from group import group_segments
@@ -33,15 +34,52 @@ def check_prerequisites(config: dict) -> None:
         ) from e
 
 
+def is_url(s: str) -> bool:
+    p = urlparse(s)
+    return p.scheme in ("http", "https") and bool(p.netloc)
+
+
+def download_video(url: str, out_dir: str = "data") -> str:
+    if subprocess.run(["which", "yt-dlp"], capture_output=True).returncode != 0:
+        raise RuntimeError("yt-dlp not found. Install with: brew install yt-dlp")
+
+    Path(out_dir).mkdir(parents=True, exist_ok=True)
+    template = f"{out_dir}/%(title).100B [%(id)s].%(ext)s"
+    print(f"Downloading {url} ...")
+    result = subprocess.run(
+        [
+            "yt-dlp",
+            "-f", "bv*+ba/b",
+            "-S", "res:720",
+            "--merge-output-format", "mp4",
+            "--print", "after_move:filepath",
+            "--no-simulate",
+            "-o", template,
+            url,
+        ],
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"yt-dlp failed:\n{result.stderr}")
+
+    path = result.stdout.strip().splitlines()[-1]
+    print(f"Saved to: {path}")
+    return path
+
+
 def main() -> None:
     if len(sys.argv) < 2:
-        print("Usage: python dub.py <video_file>")
+        print("Usage: python dub.py <video_file|url>")
         sys.exit(1)
 
-    video_path = sys.argv[1]
-    if not Path(video_path).exists():
-        print(f"Error: File not found: {video_path}")
-        sys.exit(1)
+    arg = sys.argv[1]
+    if is_url(arg):
+        video_path = download_video(arg)
+    else:
+        video_path = arg
+        if not Path(video_path).exists():
+            print(f"Error: File not found: {video_path}")
+            sys.exit(1)
 
     config = load_config()
 
