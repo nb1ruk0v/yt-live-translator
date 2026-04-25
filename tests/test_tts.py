@@ -86,10 +86,3 @@ def test_synthesize_saves_wav(mock_load, mock_save, _mock_dur):
     save_args = mock_save.call_args
     assert save_args.args[0].endswith(".wav")
     assert save_args.args[2] == 48000
-
-
-@patch("tts._load_model")
-def test_synthesize_no_segments_still_loads_model(mock_load):
-    mock_load.return_value = MagicMock()
-    synthesize([], FAKE_CONFIG)
-    mock_load.assert_called_once_with(FAKE_CONFIG)

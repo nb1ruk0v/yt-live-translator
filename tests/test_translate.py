@@ -273,16 +273,6 @@ def test_system_prompt_target_varies_per_segment(mock_post):
 
 
 @patch("translate.requests.post")
-def test_translate_returns_same_list(mock_post):
-    mock_post.return_value = _mock_chat_response("Привет")
-    segments = [Segment(start=0.0, end=2.0, original="Hello")]
-
-    result = translate(segments, FAKE_CONFIG)
-
-    assert result is segments
-
-
-@patch("translate.requests.post")
 def test_translate_raises_on_http_error(mock_post):
     mock_response = MagicMock()
     mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("500")

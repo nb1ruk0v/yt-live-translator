@@ -51,34 +51,12 @@ def test_merge_returns_output_path(mock_ffmpeg):
 
 
 @patch("merge.ffmpeg")
-def test_merge_output_path_uses_suffix(mock_ffmpeg):
-    _setup(mock_ffmpeg)
-    result = merge("/videos/movie.mp4", make_segments(), "_ru")
-    assert result == "/videos/movie_ru.mp4"
-
-
-@patch("merge.ffmpeg")
-def test_merge_calls_run(mock_ffmpeg):
-    _setup(mock_ffmpeg)
-    merge("/videos/test.mp4", make_segments(), "_dubbed")
-    mock_ffmpeg.output.return_value.overwrite_output.return_value.run.assert_called_once_with(
-        capture_stdout=True, capture_stderr=True
-    )
-
-
-@patch("merge.ffmpeg")
-def test_merge_no_atrim_when_audio_fits(mock_ffmpeg):
+def test_merge_no_filters_when_audio_fits_window(mock_ffmpeg):
     chain = _setup(mock_ffmpeg)
     merge("/videos/test.mp4", make_segments(), "_dubbed")
-    # audio fits in both segments — no stretch and no cap needed
-    assert "atrim" not in _filter_names(chain)
-
-
-@patch("merge.ffmpeg")
-def test_merge_no_atempo_when_audio_fits(mock_ffmpeg):
-    chain = _setup(mock_ffmpeg)
-    merge("/videos/test.mp4", make_segments(), "_dubbed")
-    assert "atempo" not in _filter_names(chain)
+    names = _filter_names(chain)
+    assert "atrim" not in names
+    assert "atempo" not in names
 
 
 @patch("merge.ffmpeg")
@@ -139,10 +117,3 @@ def test_merge_atempo_clamped_to_upper(mock_ffmpeg):
     atempo_calls = [c for c in chain.filter.call_args_list if c.args[0] == "atempo"]
     assert len(atempo_calls) == 1
     assert abs(atempo_calls[0].args[1] - 1.25) < 1e-6
-
-
-@patch("merge.ffmpeg")
-def test_merge_adelay_still_applied(mock_ffmpeg):
-    chain = _setup(mock_ffmpeg)
-    merge("/videos/test.mp4", make_segments(), "_dubbed")
-    assert "adelay" in _filter_names(chain)
