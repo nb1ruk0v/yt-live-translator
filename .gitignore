@@ -7,6 +7,7 @@ dist/
 .eggs/
 .pytest_cache/
 data/
+experiments
 
 .DS_Store
 .claude
