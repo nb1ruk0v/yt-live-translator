@@ -60,6 +60,9 @@ def translate(segments: list[Segment], config: dict) -> list[Segment]:
             continue
 
         messages = _build_messages(seg.original, history[-CONTEXT_WINDOW:])
+        # TODO: вынести HTTP-вызов Ollama в отдельный инфра-слой (LLMClient/OllamaClient).
+        # Сейчас бизнес-логика перевода (промптинг, history, fallback) смешана с транспортом
+        # (URL, timeout, JSON-парсинг). Разнести — упростит замену провайдера и моки в тестах.
         response = requests.post(
             f"{config['ollama_url']}/api/chat",
             json={
