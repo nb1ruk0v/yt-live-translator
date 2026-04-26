@@ -29,7 +29,7 @@ brew install ffmpeg
 brew install yt-dlp      # only if you plan to feed URLs
 
 # LLM for translation
-ollama pull llama3.1:8b
+ollama pull gemma4:e4b
 ollama serve
 ```
 
@@ -96,7 +96,7 @@ grouping:
   max_duration: 12.0     # seconds — upper bound on merged segment duration
 
 translation:
-  model: "llama3.1:8b"
+  model: "gemma4:e4b"
   ollama_url: "http://localhost:11434"
 
 tts:
@@ -118,7 +118,7 @@ voice cloning — if you need that, look at F5-TTS / XTTS.
 |---|---|---|
 | Transcription | faster-whisper | Whisper, CPU, `int8` |
 | Grouping | `src/group.py` | Merges short Whisper segments by `gap_threshold`, capped by `max_duration` |
-| Translation | Ollama (`/api/chat`, `llama3.1:8b`) | Sliding-window history N=3, `temperature=0`, length hint |
+| Translation | Ollama (`/api/chat`, `gemma4:e4b`) | Sliding-window history N=3, `temperature=0`, length hint |
 | Speech synthesis | Silero TTS (`v4_ru`) | RU, loaded via `torch.hub` from `snakers4/silero-models` |
 | Mux | ffmpeg / ffmpeg-python | Audio extraction, atempo stretch, amix |
 | URL download | yt-dlp | Optional — only when the input is an http(s) URL |

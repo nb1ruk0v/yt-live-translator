@@ -7,3 +7,6 @@ dist/
 .eggs/
 .pytest_cache/
 data/
+
+.DS_Store
+.claude

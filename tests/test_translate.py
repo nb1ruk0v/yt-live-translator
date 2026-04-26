@@ -47,7 +47,7 @@ class TestClean:
 
 
 FAKE_CONFIG = {
-    "model": "llama3.1:8b",
+    "model": "gemma4:e4b",
     "ollama_url": "http://localhost:11434",
 }
 
