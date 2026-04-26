@@ -1,7 +1,7 @@
 transcription:
   model: "turbo"
   device: "cpu"          # cpu, cuda, mps
-  language: "auto"       # auto = detect, или "en", "ru", etc.
+  language: "en"       # auto = detect, или "en", "ru", etc.
 
 grouping:
   gap_threshold: 0.3     # сек — сегменты с gap меньше этого склеиваются
