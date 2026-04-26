@@ -9,6 +9,9 @@ from segment import Segment
 SENTENCE_END = (".", "!", "?", "…")
 
 
+# TODO: пересмотреть необходимость двухэтапной сегментации (_resegment здесь + group.py поверх).
+# _resegment режет слова в куски ≤8с по пунктуации/паузам, group.py потом склеивает их обратно
+# до ≤12с по другим порогам — возможно, эту логику стоит унифицировать в одну ступень.
 def _resegment(
     words: list,
     max_duration: float = 8.0,
@@ -73,8 +76,15 @@ def transcribe(video_path: str, config: dict) -> list[Segment]:
 
         language = config.get("language")
         lang_arg = None if language == "auto" else language
-        segments_gen, _ = model.transcribe(audio_path, language=lang_arg, word_timestamps=True)
+        segments_gen, _ = model.transcribe(
+            audio_path,
+            language=lang_arg,
+            word_timestamps=True,
+            vad_filter=True,
+            log_progress=True,
+        )
 
+        # TODO: use prob of word
         words = [w for seg in segments_gen for w in seg.words]
         return _resegment(words)
     finally:

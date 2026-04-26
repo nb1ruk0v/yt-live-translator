@@ -113,8 +113,9 @@ def test_transcribe_uses_word_timestamps_and_returns_resegmented(mock_run, mock_
 
     result = transcribe("video.mp4", FAKE_CONFIG)
 
-    # word_timestamps must be on
+    # word_timestamps and vad_filter must be on
     assert mock_instance.transcribe.call_args[1]["word_timestamps"] is True
+    assert mock_instance.transcribe.call_args[1]["vad_filter"] is True
 
     assert len(result) == 2
     assert isinstance(result[0], Segment)
