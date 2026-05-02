@@ -7,7 +7,10 @@ dist/
 .eggs/
 .pytest_cache/
 data/
-experiments
+experiments/cache/
+experiments/results/*.mp4
+experiments/results/*.wav
+experiments/transcribe_compare/
 
 .DS_Store
 .claude
