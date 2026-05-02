@@ -45,6 +45,34 @@ def check_ollama_models(ollama_url: str, required: list[str]) -> None:
         )
 
 
+def format_time(seconds: float) -> str:
+    """`MM:SS.ms` для коротких видео, `HH:MM:SS.ms` для длинных."""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    sec = seconds % 60
+    if hours:
+        return f"{hours:02d}:{minutes:02d}:{sec:06.3f}"
+    return f"{minutes:02d}:{sec:06.3f}"
+
+
+def format_translations_md(
+    video_name: str,
+    gemma_segs: list,  # list[Segment]
+    aya_segs: list,  # list[Segment]
+) -> str:
+    assert len(gemma_segs) == len(aya_segs), "segment count mismatch"
+    lines = [f"# {video_name}", ""]
+    for g, a in zip(gemma_segs, aya_segs):
+        assert g.start == a.start and g.end == a.end, "timing drift between models"
+        lines.append(f"## [{format_time(g.start)} → {format_time(g.end)}] dur={g.duration:.2f}s")
+        lines.append("")
+        lines.append(f"**EN:** {g.original}")
+        lines.append(f"**gemma:** {g.translated}")
+        lines.append(f"**aya:** {a.translated}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
@@ -65,6 +93,9 @@ def main() -> None:
     videos = args.videos or VIDEOS
     cfg = load_config()
     check_ollama_models(cfg["translation"]["ollama_url"], list(MODEL_TAGS))
+    # self-check helpers
+    assert format_time(75.5) == "01:15.500", f"format_time bug: {format_time(75.5)}"
+    assert format_time(3725.5) == "01:02:05.500", f"format_time bug: {format_time(3725.5)}"
     print(f"[ab] videos: {videos}")
     print(f"[ab] skip_audio: {args.skip_audio}")
     print(f"[ab] models OK: {list(MODEL_TAGS)}")
