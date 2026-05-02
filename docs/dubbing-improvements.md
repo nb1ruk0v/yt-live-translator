@@ -193,7 +193,9 @@ Silero — фиксированные 5 голосов. F5-TTS / XTTS подде
 
 #### 11. Trim trailing silence после TTS — _open-dubbing/text_to_speech.py:158-187_
 
-**Сложность: 15/100 · Эффект: 35/100**
+> **Status (2026-05-03):** Проверено эмпирически на 3 видео из `data/`, ветка `experiment/trim-silence-benchmark`, отчёт — `experiments/results/2026-05-02-trim-benchmark.md`. Реальный эффект **≪ обещанного DoD**: `Σ audio` сократилось на 1.5–1.9% (vs 5–15%), `truncated_total` спасает ~0.8 с речи на 31-минутном видео, `overflow_count` снижается на 3–5%. На слух различия между none / silero / pydub / ffmpeg / numpy неощутимы. **Эффект понижен с 35/100 до ~5–10/100**, в `src/tts.py` не интегрировать. Pairwise sub-вывод: numpy / pydub / ffmpeg попарно ~5 мс расхождения (взаимозаменяемы); silero VAD — outlier (режет в ~10× меньше). Инфра эксперимента остаётся на ветке как каркас для повторной проверки при смене TTS (#10) или появлении vocal separation (#13).
+
+**Сложность: 15/100 · Эффект: ~~35~~ → ~5/100** (после проверки)
 
 **Проблема.** Silero часто добавляет хвостовое молчание к синтезу. Сейчас в `Segment.audio_duration` (`src/tts.py`) попадает длительность вместе с этим молчанием, и `merge.py` считает сегмент длиннее, чем он реально звучит — лишний раз триггерит `atempo`.
 
@@ -813,7 +815,7 @@ translation:
 4. **#14 SRT subtitle generation** (10 / 25). ~30 строк кода, заметная UX-фича.
 5. **#6 group.py cleanup** (10 / 5). Уборка мёртвого кода.
 6. **#1 anti-hallucination guard** (15 / 30). Страховка от leak'ов в history.
-7. **#11 trim trailing silence** после Silero (15 / 35). Через Silero VAD (как в bluez-dubbing) или pydub. Снимает 5–15% лишней длительности.
+7. ~~**#11 trim trailing silence** после Silero (15 / 35).~~ **Проверено и отклонено** (2026-05-03): эффект ~1.5–1.9% по `Σ audio`, на слух не различимо. См. `experiments/results/2026-05-02-trim-benchmark.md`.
 
 ### Фаза 2 — длина перевода и тайминг
 
