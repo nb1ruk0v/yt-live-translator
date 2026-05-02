@@ -5,6 +5,7 @@ Spec: docs/superpowers/specs/2026-05-03-aya-vs-gemma-design.md
 
 import argparse
 import sys
+from copy import deepcopy
 from pathlib import Path
 
 import requests
@@ -15,6 +16,11 @@ DATA = ROOT / "data"
 HERE = Path(__file__).resolve().parent
 
 sys.path.insert(0, str(ROOT / "src"))
+
+# from src/
+from group import group_segments  # noqa: E402
+from transcribe import transcribe  # noqa: E402
+from translate import translate  # noqa: E402
 
 VIDEOS = [
     "From Vibe Coding to Agentic Engineering.mp4",
@@ -73,6 +79,42 @@ def format_translations_md(
     return "\n".join(lines)
 
 
+def process_video(video_name: str, cfg: dict, skip_audio: bool) -> None:
+    video_path = DATA / video_name
+    if not video_path.exists():
+        raise FileNotFoundError(video_path)
+
+    print(f"\n[ab] === {video_name} ===")
+
+    print("[ab] [1/3] transcribe + group (once)")
+    base = transcribe(str(video_path), cfg["transcription"])
+    grouping = cfg.get("grouping", {})
+    base = group_segments(
+        base,
+        gap_threshold=grouping.get("gap_threshold", 0.3),
+        max_duration=grouping.get("max_duration", 12.0),
+    )
+    print(f"[ab]      base segments: {len(base)}")
+
+    per_model: dict[str, list] = {}
+    for model_name, tag in MODEL_TAGS.items():
+        print(f"[ab] [2/3] translate ({model_name})")
+        segs = deepcopy(base)
+        translate(segs, {**cfg["translation"], "model": model_name})
+        per_model[tag] = segs
+
+    md_path = HERE / f"{Path(video_name).stem}_translations.md"
+    md_path.write_text(format_translations_md(video_name, per_model["gemma"], per_model["aya"]))
+    print(f"[ab]      wrote {md_path.relative_to(ROOT)}")
+
+    if skip_audio:
+        print("[ab] [3/3] skipped (--skip-audio)")
+        return
+
+    # TTS+merge will be added in Task 6
+    raise NotImplementedError("audio path will be added in Task 6")
+
+
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument(
@@ -93,12 +135,18 @@ def main() -> None:
     videos = args.videos or VIDEOS
     cfg = load_config()
     check_ollama_models(cfg["translation"]["ollama_url"], list(MODEL_TAGS))
-    # self-check helpers
+
     assert format_time(75.5) == "01:15.500", f"format_time bug: {format_time(75.5)}"
     assert format_time(3725.5) == "01:02:05.500", f"format_time bug: {format_time(3725.5)}"
+
     print(f"[ab] videos: {videos}")
     print(f"[ab] skip_audio: {args.skip_audio}")
-    print(f"[ab] models OK: {list(MODEL_TAGS)}")
+
+    for v in videos:
+        process_video(v, cfg, skip_audio=args.skip_audio)
+
+    audio_count = 0 if args.skip_audio else len(videos) * 2
+    print(f"\n[ab] done. translations: {len(videos)}, audio: {audio_count}")
 
 
 if __name__ == "__main__":
