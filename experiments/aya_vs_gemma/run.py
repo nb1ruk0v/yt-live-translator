@@ -7,6 +7,9 @@ import argparse
 import sys
 from pathlib import Path
 
+import requests
+import yaml
+
 ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data"
 HERE = Path(__file__).resolve().parent
@@ -23,6 +26,23 @@ MODEL_TAGS = {
     "gemma4:e4b": "gemma",
     "aya-expanse:8b": "aya",
 }
+
+
+def load_config() -> dict:
+    with open(ROOT / "config.yaml") as f:
+        return yaml.safe_load(f)
+
+
+def check_ollama_models(ollama_url: str, required: list[str]) -> None:
+    r = requests.get(f"{ollama_url}/api/tags", timeout=5)
+    r.raise_for_status()
+    available = {m["name"] for m in r.json().get("models", [])}
+    missing = [m for m in required if m not in available]
+    if missing:
+        raise RuntimeError(
+            f"Missing Ollama models: {missing}. Pull with: "
+            + " && ".join(f"ollama pull {m}" for m in missing)
+        )
 
 
 def parse_args() -> argparse.Namespace:
@@ -43,9 +63,11 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     videos = args.videos or VIDEOS
+    cfg = load_config()
+    check_ollama_models(cfg["translation"]["ollama_url"], list(MODEL_TAGS))
     print(f"[ab] videos: {videos}")
     print(f"[ab] skip_audio: {args.skip_audio}")
-    print(f"[ab] models: {list(MODEL_TAGS)}")
+    print(f"[ab] models OK: {list(MODEL_TAGS)}")
 
 
 if __name__ == "__main__":
