@@ -4,6 +4,9 @@ Spec: docs/superpowers/specs/2026-05-03-srt-subtitles-design.md
 """
 
 import textwrap
+from typing import Literal
+
+from segment import Segment
 
 
 def _format_timecode(seconds: float) -> str:
@@ -37,3 +40,22 @@ def _escape(text: str) -> str:
     text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", " ")
     text = text.replace("-->", "‐‐>")  # en-dash chars, not hyphen-minus
     return text.strip()
+
+
+def write_srt(segments: list[Segment], path: str, lang: Literal["en", "ru"]) -> int:
+    """Write `segments` as SRT to `path`. Returns count of cues written.
+
+    `lang="en"` uses seg.original; `lang="ru"` uses seg.translated.
+    Existing files at `path` are overwritten.
+    """
+    count = 0
+    with open(path, "w", encoding="utf-8") as f:
+        for seg in segments:
+            text = seg.original if lang == "en" else seg.translated
+            text = _escape(text)
+            text = _wrap(text)
+            count += 1
+            f.write(f"{count}\n")
+            f.write(f"{_format_timecode(seg.start)} --> {_format_timecode(seg.end)}\n")
+            f.write(f"{text}\n\n")
+    return count
