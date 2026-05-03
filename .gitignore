@@ -15,3 +15,4 @@ experiments/transcribe_compare/
 .DS_Store
 .claude
 CLAUDE.md
+.env
