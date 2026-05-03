@@ -30,3 +30,10 @@ def _wrap(text: str, width: int = 42, max_lines: int = 2) -> str:
         last = last[: width - 1].rstrip()
     kept[-1] = last + "…"
     return "\n".join(kept)
+
+
+def _escape(text: str) -> str:
+    """Strip whitespace, collapse internal newlines to space, neutralize '-->' sequence."""
+    text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", " ")
+    text = text.replace("-->", "‐‐>")  # en-dash chars, not hyphen-minus
+    return text.strip()
