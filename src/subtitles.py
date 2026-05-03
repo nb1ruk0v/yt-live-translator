@@ -3,6 +3,7 @@
 Spec: docs/superpowers/specs/2026-05-03-srt-subtitles-design.md
 """
 
+import sys
 import textwrap
 from typing import Literal
 
@@ -46,14 +47,25 @@ def write_srt(segments: list[Segment], path: str, lang: Literal["en", "ru"]) -> 
     """Write `segments` as SRT to `path`. Returns count of cues written.
 
     `lang="en"` uses seg.original; `lang="ru"` uses seg.translated.
+    Skips segments with empty/whitespace text or invalid timing
+    (start >= end). Numbering is sequential over written cues only.
     Existing files at `path` are overwritten.
     """
     count = 0
     with open(path, "w", encoding="utf-8") as f:
-        for seg in segments:
-            text = seg.original if lang == "en" else seg.translated
-            text = _escape(text)
-            text = _wrap(text)
+        for i, seg in enumerate(segments):
+            if seg.end < seg.start:
+                print(
+                    f"[subtitles] skip: end < start at idx {i} " f"({seg.start} → {seg.end})",
+                    file=sys.stderr,
+                )
+                continue
+            if seg.start >= seg.end:
+                continue
+            raw = seg.original if lang == "en" else seg.translated
+            text = _wrap(_escape(raw))
+            if not text:
+                continue
             count += 1
             f.write(f"{count}\n")
             f.write(f"{_format_timecode(seg.start)} --> {_format_timecode(seg.end)}\n")
