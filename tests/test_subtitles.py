@@ -1,4 +1,4 @@
-from subtitles import _format_timecode, _wrap
+from subtitles import _escape, _format_timecode, _wrap
 
 
 class TestFormatTimecode:
@@ -48,3 +48,20 @@ class TestWrap:
         lines = result.split("\n")
         assert len(lines) == 2
         assert not lines[1].endswith("…")
+
+
+class TestEscape:
+    def test_strips_outer_whitespace(self):
+        assert _escape("  hello  ") == "hello"
+
+    def test_collapses_internal_newlines_to_space(self):
+        assert _escape("line1\nline2") == "line1 line2"
+
+    def test_collapses_carriage_returns(self):
+        assert _escape("line1\r\nline2") == "line1 line2"
+
+    def test_replaces_arrow_sequence(self):
+        assert _escape("a-->b") == "a‐‐>b"
+
+    def test_combined(self):
+        assert _escape("  a-->b\nc  ") == "a‐‐>b c"
