@@ -110,3 +110,56 @@ class TestWriteSrt:
         segs = [_seg(0.0, 1.0, original="A.")]
         path = tmp_path / "out.en.srt"
         assert write_srt(segs, str(path), lang="en") == 1
+
+    def test_skips_empty_translated_keeps_numbering_dense(self, tmp_path):
+        segs = [
+            _seg(0.0, 1.0, original="A.", translated="А."),
+            _seg(1.0, 2.0, original="B.", translated=""),  # пропускается
+            _seg(2.0, 3.0, original="C.", translated="В."),
+        ]
+        path = tmp_path / "out.ru.srt"
+        n = write_srt(segs, str(path), lang="ru")
+        assert n == 2
+        content = path.read_text(encoding="utf-8")
+        # Numbering is 1, 2 (no gap from skipped segment)
+        assert content.startswith("1\n")
+        assert "\n2\n" in content
+        assert "\n3\n" not in content
+
+    def test_skips_whitespace_only_text(self, tmp_path):
+        segs = [
+            _seg(0.0, 1.0, original="A."),
+            _seg(1.0, 2.0, original="   \n  "),  # whitespace only
+        ]
+        path = tmp_path / "out.en.srt"
+        n = write_srt(segs, str(path), lang="en")
+        assert n == 1
+
+    def test_skips_invalid_timing_zero_duration(self, tmp_path):
+        segs = [
+            _seg(0.0, 1.0, original="A."),
+            _seg(1.0, 1.0, original="B."),  # zero duration
+            _seg(2.0, 3.0, original="C."),
+        ]
+        path = tmp_path / "out.en.srt"
+        n = write_srt(segs, str(path), lang="en")
+        assert n == 2
+
+    def test_skips_invalid_timing_end_before_start(self, tmp_path, capsys):
+        segs = [
+            _seg(0.0, 1.0, original="A."),
+            _seg(2.0, 1.5, original="B."),  # end < start
+        ]
+        path = tmp_path / "out.en.srt"
+        n = write_srt(segs, str(path), lang="en")
+        assert n == 1
+        captured = capsys.readouterr()
+        assert "[subtitles]" in captured.err
+        assert "end < start" in captured.err
+
+    def test_empty_segments_creates_empty_file(self, tmp_path):
+        path = tmp_path / "out.en.srt"
+        n = write_srt([], str(path), lang="en")
+        assert n == 0
+        assert path.exists()
+        assert path.read_text(encoding="utf-8") == ""
