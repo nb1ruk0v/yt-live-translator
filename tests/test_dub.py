@@ -23,6 +23,7 @@ FAKE_CONFIG = {
 }
 
 
+@patch("dub.write_srt")
 @patch("dub.merge")
 @patch("dub.synthesize")
 @patch("dub.translate")
@@ -38,12 +39,14 @@ def test_main_full_pipeline(
     mock_translate,
     mock_synthesize,
     mock_merge,
+    mock_write_srt,
 ):
     mock_config.return_value = FAKE_CONFIG
     mock_transcribe.return_value = FAKE_SEGMENTS
     mock_translate.return_value = FAKE_SEGMENTS
     mock_synthesize.return_value = FAKE_SEGMENTS
     mock_merge.return_value = "/tmp/video_dubbed.mp4"
+    mock_write_srt.return_value = 1
 
     with patch("sys.argv", ["dub.py", "/tmp/video.mp4"]):
         dub.main()
