@@ -1,4 +1,5 @@
-from subtitles import _escape, _format_timecode, _wrap
+from segment import Segment
+from subtitles import _escape, _format_timecode, _wrap, write_srt
 
 
 class TestFormatTimecode:
@@ -65,3 +66,47 @@ class TestEscape:
 
     def test_combined(self):
         assert _escape("  a-->b\nc  ") == "a‐‐>b c"
+
+
+def _seg(start, end, original="", translated=""):
+    return Segment(start=start, end=end, original=original, translated=translated)
+
+
+class TestWriteSrt:
+    def test_basic_two_segments_en(self, tmp_path):
+        segs = [
+            _seg(0.0, 1.5, original="Hello world."),
+            _seg(2.0, 4.25, original="This is segment two."),
+        ]
+        path = tmp_path / "out.en.srt"
+        n = write_srt(segs, str(path), lang="en")
+        assert n == 2
+        expected = (
+            "1\n"
+            "00:00:00,000 --> 00:00:01,500\n"
+            "Hello world.\n"
+            "\n"
+            "2\n"
+            "00:00:02,000 --> 00:00:04,250\n"
+            "This is segment two.\n"
+            "\n"
+        )
+        assert path.read_text(encoding="utf-8") == expected
+
+    def test_basic_two_segments_ru(self, tmp_path):
+        segs = [
+            _seg(0.0, 1.0, original="Hi.", translated="Привет."),
+            _seg(1.0, 2.0, original="Bye.", translated="Пока."),
+        ]
+        path = tmp_path / "out.ru.srt"
+        n = write_srt(segs, str(path), lang="ru")
+        assert n == 2
+        content = path.read_text(encoding="utf-8")
+        assert "Привет." in content
+        assert "Пока." in content
+        assert "Hi." not in content
+
+    def test_returns_cue_count(self, tmp_path):
+        segs = [_seg(0.0, 1.0, original="A.")]
+        path = tmp_path / "out.en.srt"
+        assert write_srt(segs, str(path), lang="en") == 1
