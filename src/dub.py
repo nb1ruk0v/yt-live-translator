@@ -8,6 +8,7 @@ import yaml
 
 from group import group_segments
 from merge import merge
+from subtitles import write_srt
 from transcribe import transcribe
 from translate import translate
 from tts import synthesize
@@ -90,7 +91,7 @@ def main() -> None:
     print("Checking prerequisites...")
     check_prerequisites(config)
 
-    print("[1/4] Transcribing...")
+    print("[1/5] Transcribing...")
     segments = transcribe(video_path, config["transcription"])
     print(f"      Found {len(segments)} segments")
 
@@ -100,14 +101,22 @@ def main() -> None:
     segments = group_segments(segments, gap_threshold=gap, max_duration=max_dur)
     print(f"      Grouped into {len(segments)} (gap < {gap}s, max {max_dur}s)")
 
-    print("[2/4] Translating...")
+    print("[2/5] Translating...")
     segments = translate(segments, config["translation"])
 
-    print("[3/4] Synthesizing speech...")
+    print("[3/5] Synthesizing speech...")
     segments = synthesize(segments, config["tts"])
 
-    print("[4/4] Merging audio...")
+    print("[4/5] Merging audio...")
     output = merge(video_path, segments, config["output"]["suffix"])
+
+    print("[5/5] Writing subtitles...")
+    out = Path(output)
+    en_srt = out.with_suffix(".en.srt")
+    ru_srt = out.with_suffix(".ru.srt")
+    en_count = write_srt(segments, str(en_srt), lang="en")
+    ru_count = write_srt(segments, str(ru_srt), lang="ru")
+    print(f"      {en_srt.name}: {en_count} cues, {ru_srt.name}: {ru_count} cues")
 
     print(f"\nDone! Output saved to: {output}")
 
