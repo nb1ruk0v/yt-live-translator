@@ -25,30 +25,27 @@ class TestWrap:
     def test_short_text_single_line(self):
         assert _wrap("Hello world") == "Hello world"
 
-    def test_long_text_two_lines(self):
-        # ~60 chars → must split into 2 lines, each ≤42
-        text = "Today we are going to walk through prompting best practices today"
+    def test_long_text_wraps_at_64(self):
+        # ~110 chars → splits into ≥2 lines, each ≤64
+        text = (
+            "Today we are going to walk through prompting "
+            "best practices today and tomorrow as well as next week"
+        )
         result = _wrap(text)
         lines = result.split("\n")
-        assert len(lines) == 2
-        assert all(len(line) <= 42 for line in lines)
+        assert len(lines) >= 2
+        assert all(len(line) <= 64 for line in lines)
 
-    def test_overflow_truncates_with_ellipsis(self):
-        # Very long text → 2 lines, last ends with "…"
-        text = "word " * 60  # 300 chars of "word word word..."
+    def test_very_long_text_no_truncation(self):
+        # ~500 chars → wraps into many lines, none ends with '…'
+        text = "word " * 100  # 500 chars
         result = _wrap(text)
         lines = result.split("\n")
-        assert len(lines) == 2
-        assert lines[1].endswith("…")
-        assert all(len(line) <= 42 for line in lines)
-
-    def test_exact_two_lines_no_ellipsis(self):
-        # Fits exactly in 2 lines without truncation → no ellipsis
-        text = "a" * 30 + " " + "b" * 30  # 61 chars, splits 30/30 by space
-        result = _wrap(text)
-        lines = result.split("\n")
-        assert len(lines) == 2
-        assert not lines[1].endswith("…")
+        assert len(lines) >= 5
+        assert all(len(line) <= 64 for line in lines)
+        assert not any(line.endswith("…") for line in lines)
+        # Round-trip: re-joining lines reconstructs the original word stream
+        assert result.replace("\n", " ") == text.strip()
 
 
 class TestEscape:
