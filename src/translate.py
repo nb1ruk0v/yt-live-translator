@@ -8,9 +8,14 @@ from segment import Segment
 SYSTEM_PROMPT = (
     "You are a professional subtitle translator. "
     "Translate the user's text to natural, fluent Russian. "
-    "Preserve meaning, tone and proper nouns. "
+    "Preserve meaning and tone. "
+    "Transliterate ALL English words, brand names, and proper nouns to Cyrillic "
+    "(e.g., Anthropic → Антропик, Applied AI → Эпплайд эй-ай, "
+    "OpenAI → ОупенЭйАй, Claude → Клод, GPT → Джи-Пи-Ти). "
+    "The output must contain ONLY Cyrillic letters, digits and standard punctuation — "
+    "no Latin characters whatsoever. "
     "Output ONLY the Russian translation — no quotes, no prefixes, "
-    "no explanations, no notes, no English."
+    "no explanations, no notes."
 )
 
 CONTEXT_WINDOW = 3
