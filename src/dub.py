@@ -6,7 +6,6 @@ from urllib.parse import urlparse
 import requests
 import yaml
 
-from group import group_segments
 from merge import merge
 from subtitles import write_srt
 from transcribe import transcribe
@@ -94,12 +93,6 @@ def main() -> None:
     print("[1/5] Transcribing...")
     segments = transcribe(video_path, config["transcription"])
     print(f"      Found {len(segments)} segments")
-
-    grouping = config.get("grouping", {})
-    gap = grouping.get("gap_threshold", 0.3)
-    max_dur = grouping.get("max_duration", 12.0)
-    segments = group_segments(segments, gap_threshold=gap, max_duration=max_dur)
-    print(f"      Grouped into {len(segments)} (gap < {gap}s, max {max_dur}s)")
 
     print("[2/5] Translating...")
     segments = translate(segments, config["translation"])

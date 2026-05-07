@@ -9,9 +9,6 @@ from segment import Segment
 SENTENCE_END = (".", "!", "?", "…")
 
 
-# TODO: пересмотреть необходимость двухэтапной сегментации (_resegment здесь + group.py поверх).
-# _resegment режет слова в куски ≤8с по пунктуации/паузам, group.py потом склеивает их обратно
-# до ≤12с по другим порогам — возможно, эту логику стоит унифицировать в одну ступень.
 def _resegment(
     words: list,
     max_duration: float = 8.0,

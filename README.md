@@ -1,6 +1,6 @@
 # vt-claude — Video Translation & Dubbing
 
-Automatic video dubbing pipeline: transcription → grouping → translation → speech synthesis → mux.
+Automatic video dubbing pipeline: transcription → translation → speech synthesis → mux.
 
 ## Quick start
 
@@ -43,9 +43,6 @@ video.mp4 / URL
     ▼
 [1] src/transcribe.py   faster-whisper      text + timings (Segment.original)
     │
-    ▼
-    src/group.py        gap-based merge     short segments are merged
-    │                                       (with max_duration cap)
     ▼
 [2] src/translate.py    Ollama /api/chat    translation to RU with N=3 history
     │                                       (Segment.translated)
@@ -91,10 +88,6 @@ transcription:
   device: "cpu"          # cpu | cuda | mps
   language: "auto"       # auto = autodetect, or "en", "ru", etc.
 
-grouping:
-  gap_threshold: 0.3     # seconds — segments with a smaller gap are merged
-  max_duration: 12.0     # seconds — upper bound on merged segment duration
-
 translation:
   model: "gemma4:e4b"
   ollama_url: "http://localhost:11434"
@@ -117,7 +110,6 @@ voice cloning — if you need that, look at F5-TTS / XTTS.
 | Component | Tool | Purpose |
 |---|---|---|
 | Transcription | faster-whisper | Whisper, CPU, `int8` |
-| Grouping | `src/group.py` | Merges short Whisper segments by `gap_threshold`, capped by `max_duration` |
 | Translation | Ollama (`/api/chat`, `gemma4:e4b`) | Sliding-window history N=3, `temperature=0`, length hint |
 | Speech synthesis | Silero TTS (`v4_ru`) | RU, loaded via `torch.hub` from `snakers4/silero-models` |
 | Mux | ffmpeg / ffmpeg-python | Audio extraction, atempo stretch, amix |
@@ -130,4 +122,4 @@ uv run pytest
 ```
 
 Unit tests cover `translate` (including `_clean`, history, fallback),
-`group`, `merge`, `tts`, `transcribe`, `dub`, `segment`.
+`merge`, `tts`, `transcribe`, `dub`, `segment`.
