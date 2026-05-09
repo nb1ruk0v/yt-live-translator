@@ -8,10 +8,10 @@ translation:
   ollama_url: "http://localhost:11434"
 
 tts:
-  model: "v4_ru"         # Silero RU model bundle
+  model: "tts_models/multilingual/multi-dataset/xtts_v2"
   language: "ru"
-  speaker: "kseniya"      # aidar | eugene | baya | kseniya | xenia
-  sample_rate: 48000
+  device: "cpu"          # cpu, cuda, mps
+  reference_seconds: 10  # длина клипа референса для voice cloning
 
 output:
   suffix: "_dubbed"

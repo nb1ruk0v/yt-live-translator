@@ -98,7 +98,7 @@ def main() -> None:
     segments = translate(segments, config["translation"])
 
     print("[3/5] Synthesizing speech...")
-    segments = synthesize(segments, config["tts"])
+    segments = synthesize(segments, config["tts"], video_path)
 
     print("[4/5] Merging audio...")
     output = merge(video_path, segments, config["output"]["suffix"])

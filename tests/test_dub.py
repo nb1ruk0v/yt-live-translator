@@ -18,7 +18,12 @@ FAKE_SEGMENTS = [
 FAKE_CONFIG = {
     "transcription": {"model": "base", "device": "cpu", "language": "auto"},
     "translation": {"model": "llama3.2:3b", "ollama_url": "http://localhost:11434"},
-    "tts": {"model": "xtts_v2", "language": "ru", "speaker_wav": None},
+    "tts": {
+        "model": "tts_models/multilingual/multi-dataset/xtts_v2",
+        "language": "ru",
+        "device": "cpu",
+        "reference_seconds": 10,
+    },
     "output": {"suffix": "_dubbed"},
 }
 
@@ -53,7 +58,7 @@ def test_main_full_pipeline(
 
     mock_transcribe.assert_called_once()
     mock_translate.assert_called_once_with(FAKE_SEGMENTS, FAKE_CONFIG["translation"])
-    mock_synthesize.assert_called_once_with(FAKE_SEGMENTS, FAKE_CONFIG["tts"])
+    mock_synthesize.assert_called_once_with(FAKE_SEGMENTS, FAKE_CONFIG["tts"], "/tmp/video.mp4")
     mock_merge.assert_called_once_with("/tmp/video.mp4", FAKE_SEGMENTS, "_dubbed")
 
 

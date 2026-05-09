@@ -5,9 +5,11 @@ requires-python = ">=3.11,<3.12"
 dependencies = [
     "faster-whisper",
     "torch",
+    "torchaudio",
     "numpy",
     "omegaconf",
-    "num2words",
+    "coqui-tts[codec]",
+    "transformers<5",
     "ffmpeg-python",
     "requests",
     "pyyaml",
