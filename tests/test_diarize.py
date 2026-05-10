@@ -1,3 +1,6 @@
+from unittest.mock import patch
+
+import diarize
 from diarize import _assign_speaker
 
 
@@ -34,3 +37,27 @@ def test_segment_fully_inside_one_interval():
 
 def test_empty_intervals_returns_unknown():
     assert _assign_speaker(0.0, 1.0, []) == "SPEAKER_UNKNOWN"
+
+
+@patch("diarize.subprocess.run")
+@patch("diarize.os.path.exists", return_value=True)
+def test_ensure_audio_returns_existing_path_without_ffmpeg(mock_exists, mock_run):
+    path = diarize._ensure_audio("/tmp/clip.mp4")
+    assert path == "/tmp/clip.wav"
+    mock_run.assert_not_called()
+
+
+@patch("diarize.subprocess.run")
+@patch("diarize.os.path.exists", return_value=False)
+def test_ensure_audio_extracts_when_missing(mock_exists, mock_run):
+    mock_run.return_value.returncode = 0
+
+    path = diarize._ensure_audio("/tmp/clip.mp4")
+
+    assert path == "/tmp/clip.wav"
+    mock_run.assert_called_once()
+    cmd = mock_run.call_args[0][0]
+    assert cmd[0] == "ffmpeg"
+    assert "/tmp/clip.mp4" in cmd
+    assert "/tmp/clip.wav" in cmd
+    assert "22050" in cmd  # sample rate

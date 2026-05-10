@@ -1,3 +1,7 @@
+import os
+import subprocess
+
+
 def _assign_speaker(
     seg_start: float,
     seg_end: float,
@@ -11,3 +15,27 @@ def _assign_speaker(
             best_overlap = overlap
             best_speaker = speaker
     return best_speaker
+
+
+def _ensure_audio(video_path: str) -> str:
+    audio_path = os.path.splitext(video_path)[0] + ".wav"
+    if os.path.exists(audio_path):
+        return audio_path
+
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            video_path,
+            "-ac",
+            "1",
+            "-ar",
+            "22050",
+            "-vn",
+            audio_path,
+        ],
+        check=True,
+        capture_output=True,
+    )
+    return audio_path
