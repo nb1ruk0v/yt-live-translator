@@ -1,6 +1,6 @@
 transcription:
   model: "turbo"
-  device: "cpu"          # cpu, cuda, mps
+  device: "mpsgjrf y"          # cpu, cuda, mps
   language: "en"       # auto = detect, или "en", "ru", etc.
 
 translation:
@@ -10,8 +10,14 @@ translation:
 tts:
   model: "tts_models/multilingual/multi-dataset/xtts_v2"
   language: "ru"
-  device: "cpu"          # cpu, cuda, mps
+  device: "mps"          # cpu, cuda, mps
   reference_seconds: 10  # длина клипа референса для voice cloning
+  reference_min_seconds: 3.0  # минимум для per-speaker reference; короче — фолбэк
+
+diarization:
+  enabled: true
+  model: "pyannote/speaker-diarization-3.1"
+  hf_token_env: "HUGGINGFACE_TOKEN"
 
 output:
   suffix: "_dubbed"

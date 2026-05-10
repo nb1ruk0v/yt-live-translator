@@ -27,6 +27,24 @@ FAKE_CONFIG = {
     "output": {"suffix": "_dubbed"},
 }
 
+FAKE_CONFIG_WITH_DIARIZATION = {
+    **FAKE_CONFIG,
+    "diarization": {
+        "enabled": True,
+        "model": "pyannote/speaker-diarization-3.1",
+        "hf_token_env": "HUGGINGFACE_TOKEN",
+    },
+}
+
+FAKE_CONFIG_DIARIZATION_DISABLED = {
+    **FAKE_CONFIG,
+    "diarization": {
+        "enabled": False,
+        "model": "pyannote/speaker-diarization-3.1",
+        "hf_token_env": "HUGGINGFACE_TOKEN",
+    },
+}
+
 
 @patch("dub.write_srt")
 @patch("dub.merge")
@@ -46,7 +64,7 @@ def test_main_full_pipeline(
     mock_merge,
     mock_write_srt,
 ):
-    mock_config.return_value = FAKE_CONFIG
+    mock_config.return_value = FAKE_CONFIG_DIARIZATION_DISABLED
     mock_transcribe.return_value = FAKE_SEGMENTS
     mock_translate.return_value = FAKE_SEGMENTS
     mock_synthesize.return_value = FAKE_SEGMENTS
@@ -57,8 +75,12 @@ def test_main_full_pipeline(
         dub.main()
 
     mock_transcribe.assert_called_once()
-    mock_translate.assert_called_once_with(FAKE_SEGMENTS, FAKE_CONFIG["translation"])
-    mock_synthesize.assert_called_once_with(FAKE_SEGMENTS, FAKE_CONFIG["tts"], "/tmp/video.mp4")
+    mock_translate.assert_called_once_with(
+        FAKE_SEGMENTS, FAKE_CONFIG_DIARIZATION_DISABLED["translation"]
+    )
+    mock_synthesize.assert_called_once_with(
+        FAKE_SEGMENTS, FAKE_CONFIG_DIARIZATION_DISABLED["tts"], "/tmp/video.mp4"
+    )
     mock_merge.assert_called_once_with("/tmp/video.mp4", FAKE_SEGMENTS, "_dubbed")
 
 
@@ -77,3 +99,85 @@ def test_main_exits_if_file_not_found(mock_exists, mock_config):
         with pytest.raises(SystemExit) as exc_info:
             dub.main()
         assert exc_info.value.code == 1
+
+
+@patch("dub.write_srt")
+@patch("dub.merge")
+@patch("dub.synthesize")
+@patch("dub.translate")
+@patch("dub.diarize")
+@patch("dub.transcribe")
+@patch("dub.check_prerequisites")
+@patch("dub.load_config")
+@patch("pathlib.Path.exists", return_value=True)
+@patch.dict("os.environ", {"HUGGINGFACE_TOKEN": "fake"})
+def test_main_runs_diarize_when_enabled(
+    mock_exists,
+    mock_config,
+    mock_check,
+    mock_transcribe,
+    mock_diarize,
+    mock_translate,
+    mock_synthesize,
+    mock_merge,
+    mock_write_srt,
+):
+    mock_config.return_value = FAKE_CONFIG_WITH_DIARIZATION
+    mock_transcribe.return_value = FAKE_SEGMENTS
+    mock_diarize.return_value = FAKE_SEGMENTS
+    mock_translate.return_value = FAKE_SEGMENTS
+    mock_synthesize.return_value = FAKE_SEGMENTS
+    mock_merge.return_value = "/tmp/video_dubbed.mp4"
+    mock_write_srt.return_value = 1
+
+    with patch("sys.argv", ["dub.py", "/tmp/video.mp4"]):
+        dub.main()
+
+    mock_diarize.assert_called_once_with(
+        "/tmp/video.mp4", FAKE_SEGMENTS, FAKE_CONFIG_WITH_DIARIZATION["diarization"]
+    )
+
+
+@patch("dub.write_srt")
+@patch("dub.merge")
+@patch("dub.synthesize")
+@patch("dub.translate")
+@patch("dub.diarize")
+@patch("dub.transcribe")
+@patch("dub.check_prerequisites")
+@patch("dub.load_config")
+@patch("pathlib.Path.exists", return_value=True)
+def test_main_skips_diarize_when_disabled(
+    mock_exists,
+    mock_config,
+    mock_check,
+    mock_transcribe,
+    mock_diarize,
+    mock_translate,
+    mock_synthesize,
+    mock_merge,
+    mock_write_srt,
+):
+    mock_config.return_value = FAKE_CONFIG_DIARIZATION_DISABLED
+    mock_transcribe.return_value = FAKE_SEGMENTS
+    mock_translate.return_value = FAKE_SEGMENTS
+    mock_synthesize.return_value = FAKE_SEGMENTS
+    mock_merge.return_value = "/tmp/video_dubbed.mp4"
+    mock_write_srt.return_value = 1
+
+    with patch("sys.argv", ["dub.py", "/tmp/video.mp4"]):
+        dub.main()
+
+    mock_diarize.assert_not_called()
+
+
+@patch.dict("os.environ", {}, clear=True)
+def test_check_prerequisites_fails_without_hf_token_when_diarization_enabled():
+    import pytest
+
+    with patch("dub.subprocess.run") as mock_run, patch("dub.requests.get") as mock_req:
+        mock_run.return_value.returncode = 0
+        mock_req.return_value.raise_for_status = lambda: None
+
+        with pytest.raises(RuntimeError, match="HUGGINGFACE_TOKEN"):
+            dub.check_prerequisites(FAKE_CONFIG_WITH_DIARIZATION)

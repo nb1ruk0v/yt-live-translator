@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -5,12 +6,16 @@ from urllib.parse import urlparse
 
 import requests
 import yaml
+from dotenv import load_dotenv
 
+from diarize import diarize
 from merge import merge
 from subtitles import write_srt
 from transcribe import transcribe
 from translate import translate
 from tts import synthesize
+
+load_dotenv()
 
 
 def load_config(path: str = "config.yaml") -> dict:
@@ -30,6 +35,15 @@ def check_prerequisites(config: dict) -> None:
         raise RuntimeError(
             f"Ollama not reachable at {config['translation']['ollama_url']}. Run: ollama serve"
         ) from e
+
+    diar = config.get("diarization", {})
+    if diar.get("enabled"):
+        token_env = diar.get("hf_token_env", "HUGGINGFACE_TOKEN")
+        if not os.environ.get(token_env):
+            raise RuntimeError(
+                f"{token_env} not set. Add it to .env (see README) "
+                "or disable diarization in config.yaml."
+            )
 
 
 def is_url(s: str) -> bool:
@@ -90,20 +104,35 @@ def main() -> None:
     print("Checking prerequisites...")
     check_prerequisites(config)
 
-    print("[1/5] Transcribing...")
+    diar_enabled = config.get("diarization", {}).get("enabled", False)
+    total = 6 if diar_enabled else 5
+    step = 1
+
+    print(f"[{step}/{total}] Transcribing...")
     segments = transcribe(video_path, config["transcription"])
     print(f"      Found {len(segments)} segments")
+    step += 1
 
-    print("[2/5] Translating...")
+    if diar_enabled:
+        print(f"[{step}/{total}] Diarizing...")
+        segments = diarize(video_path, segments, config["diarization"])
+        speakers = sorted({s.speaker for s in segments if s.speaker})
+        print(f"      Speakers: {', '.join(speakers) or '(none)'}")
+        step += 1
+
+    print(f"[{step}/{total}] Translating...")
     segments = translate(segments, config["translation"])
+    step += 1
 
-    print("[3/5] Synthesizing speech...")
+    print(f"[{step}/{total}] Synthesizing speech...")
     segments = synthesize(segments, config["tts"], video_path)
+    step += 1
 
-    print("[4/5] Merging audio...")
+    print(f"[{step}/{total}] Merging audio...")
     output = merge(video_path, segments, config["output"]["suffix"])
+    step += 1
 
-    print("[5/5] Writing subtitles...")
+    print(f"[{step}/{total}] Writing subtitles...")
     out = Path(output)
     en_srt = out.with_suffix(".en.srt")
     ru_srt = out.with_suffix(".ru.srt")
