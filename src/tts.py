@@ -158,12 +158,23 @@ def _load_model(config: dict):
 
 
 def synthesize(segments: list[Segment], config: dict, video_path: str) -> list[Segment]:
-    ref_path = _extract_reference(
+    refs = _extract_per_speaker_references(
         video_path,
         segments,
         target_seconds=config.get("reference_seconds", 10.0),
+        min_seconds=config.get("reference_min_seconds", 3.0),
     )
-    print(f"      Reference: {ref_path}")
+
+    if refs:
+        fallback_ref = refs[sorted(refs.keys())[0]]
+        print(f"      References: {len(refs)} speakers, fallback={fallback_ref}")
+    else:
+        fallback_ref = _extract_reference(
+            video_path,
+            segments,
+            target_seconds=config.get("reference_seconds", 10.0),
+        )
+        print(f"      Reference: {fallback_ref} (single-speaker mode)")
 
     model = _load_model(config)
     language = config.get("language", "ru")
@@ -171,6 +182,7 @@ def synthesize(segments: list[Segment], config: dict, video_path: str) -> list[S
     for i, seg in enumerate(segments):
         out_path = os.path.join(tempfile.gettempdir(), f"seg_{i:04d}.wav")
         text = seg.translated.strip()
+        ref_path = refs.get(seg.speaker, fallback_ref)
 
         if not text:
             _write_silence(out_path)

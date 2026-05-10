@@ -20,9 +20,10 @@ def make_segments():
 
 
 @patch("tts._wav_duration", return_value=1.0)
+@patch("tts._extract_per_speaker_references", return_value={})
 @patch("tts._extract_reference", return_value="/tmp/video_ref.wav")
 @patch("tts._load_model")
-def test_synthesize_fills_audio_path(mock_load, _mock_ref, _mock_dur):
+def test_synthesize_fills_audio_path(mock_load, _mock_ref, _mock_per_speaker, _mock_dur):
     mock_load.return_value = MagicMock()
 
     result = synthesize(make_segments(), FAKE_CONFIG, "/tmp/video.mp4")
@@ -32,9 +33,10 @@ def test_synthesize_fills_audio_path(mock_load, _mock_ref, _mock_dur):
 
 
 @patch("tts._wav_duration", return_value=1.0)
+@patch("tts._extract_per_speaker_references", return_value={})
 @patch("tts._extract_reference", return_value="/tmp/video_ref.wav")
 @patch("tts._load_model")
-def test_synthesize_passes_text_and_reference(mock_load, _mock_ref, _mock_dur):
+def test_synthesize_passes_text_and_reference(mock_load, _mock_ref, _mock_per_speaker, _mock_dur):
     model = MagicMock()
     mock_load.return_value = model
 
@@ -48,9 +50,10 @@ def test_synthesize_passes_text_and_reference(mock_load, _mock_ref, _mock_dur):
 
 
 @patch("tts._wav_duration", return_value=1.0)
+@patch("tts._extract_per_speaker_references", return_value={})
 @patch("tts._extract_reference", return_value="/tmp/video_ref.wav")
 @patch("tts._load_model")
-def test_synthesize_populates_audio_duration(mock_load, _mock_ref, mock_dur):
+def test_synthesize_populates_audio_duration(mock_load, _mock_ref, _mock_per_speaker, mock_dur):
     mock_load.return_value = MagicMock()
     mock_dur.return_value = 1.7
 
@@ -61,11 +64,12 @@ def test_synthesize_populates_audio_duration(mock_load, _mock_ref, mock_dur):
 
 
 @patch("tts._wav_duration", return_value=0.05)
+@patch("tts._extract_per_speaker_references", return_value={})
 @patch("tts._extract_reference", return_value="/tmp/video_ref.wav")
 @patch("tts._load_model")
 @patch("tts._write_silence")
 def test_synthesize_writes_silence_for_empty_translation(
-    mock_silence, mock_load, _mock_ref, _mock_dur
+    mock_silence, mock_load, _mock_ref, _mock_per_speaker, _mock_dur
 ):
     model = MagicMock()
     mock_load.return_value = model
@@ -163,3 +167,73 @@ def test_per_speaker_refs_caps_clip_at_target_seconds(mock_run):
     cmd = mock_run.call_args_list[0][0][0]
     to_idx = cmd.index("-to")
     assert float(cmd[to_idx + 1]) == 10.0
+
+
+@patch("tts._wav_duration", return_value=1.0)
+@patch("tts._extract_per_speaker_references")
+@patch("tts._extract_reference", return_value="/tmp/video_ref.wav")
+@patch("tts._load_model")
+def test_synthesize_uses_per_speaker_ref_when_available(
+    mock_load, _mock_legacy_ref, mock_per_speaker, _mock_dur
+):
+    model = MagicMock()
+    mock_load.return_value = model
+    mock_per_speaker.return_value = {
+        "SPEAKER_00": "/tmp/ref_00.wav",
+        "SPEAKER_01": "/tmp/ref_01.wav",
+    }
+
+    segments = [
+        Segment(start=0.0, end=1.0, original="hi", translated="привет", speaker="SPEAKER_00"),
+        Segment(start=1.0, end=2.0, original="bye", translated="пока", speaker="SPEAKER_01"),
+    ]
+    synthesize(segments, FAKE_CONFIG, "/tmp/video.mp4")
+
+    speaker_wavs = [c[1]["speaker_wav"] for c in model.tts_to_file.call_args_list]
+    assert speaker_wavs == ["/tmp/ref_00.wav", "/tmp/ref_01.wav"]
+
+
+@patch("tts._wav_duration", return_value=1.0)
+@patch("tts._extract_per_speaker_references")
+@patch("tts._extract_reference", return_value="/tmp/video_ref.wav")
+@patch("tts._load_model")
+def test_synthesize_falls_back_to_legacy_when_no_speakers(
+    mock_load, _mock_legacy_ref, mock_per_speaker, _mock_dur
+):
+    model = MagicMock()
+    mock_load.return_value = model
+    mock_per_speaker.return_value = {}  # no diarization happened
+
+    segments = [
+        Segment(start=0.0, end=1.0, original="hi", translated="привет"),
+    ]
+    synthesize(segments, FAKE_CONFIG, "/tmp/video.mp4")
+
+    kwargs = model.tts_to_file.call_args[1]
+    assert kwargs["speaker_wav"] == "/tmp/video_ref.wav"
+
+
+@patch("tts._wav_duration", return_value=1.0)
+@patch("tts._extract_per_speaker_references")
+@patch("tts._extract_reference", return_value="/tmp/video_ref.wav")
+@patch("tts._load_model")
+def test_synthesize_falls_back_to_first_ref_for_unknown_speaker(
+    mock_load, _mock_legacy_ref, mock_per_speaker, _mock_dur
+):
+    model = MagicMock()
+    mock_load.return_value = model
+    mock_per_speaker.return_value = {"SPEAKER_00": "/tmp/ref_00.wav"}
+
+    segments = [
+        Segment(
+            start=0.0,
+            end=1.0,
+            original="hi",
+            translated="привет",
+            speaker="SPEAKER_UNKNOWN",
+        ),
+    ]
+    synthesize(segments, FAKE_CONFIG, "/tmp/video.mp4")
+
+    kwargs = model.tts_to_file.call_args[1]
+    assert kwargs["speaker_wav"] == "/tmp/ref_00.wav"
