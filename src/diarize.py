@@ -62,11 +62,11 @@ def diarize(video_path: str, segments: list[Segment], config: dict) -> list[Segm
         token=token,
     )
     with ProgressHook() as hook:
-        annotation = pipeline(audio_path, hook=hook)
+        result = pipeline(audio_path, hook=hook)
 
     intervals = [
         (turn.start, turn.end, speaker)
-        for turn, _, speaker in annotation.itertracks(yield_label=True)
+        for turn, _, speaker in result.exclusive_speaker_diarization.itertracks(yield_label=True)
     ]
 
     for seg in segments:

@@ -81,7 +81,8 @@ def test_diarize_assigns_speaker_per_segment(mock_pipeline_cls, _mock_audio):
                 turn = type("Turn", (), {"start": turn_range[0], "end": turn_range[1]})()
                 yield turn, None, speaker
 
-    pipeline.return_value = FakeAnnotation()
+    fake_output = type("DiarizeOutput", (), {"exclusive_speaker_diarization": FakeAnnotation()})()
+    pipeline.return_value = fake_output
 
     segments = [
         Segment(start=0.5, end=1.5, original="hi"),
