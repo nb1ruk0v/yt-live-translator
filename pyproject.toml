@@ -13,6 +13,8 @@ dependencies = [
     "ffmpeg-python",
     "requests",
     "pyyaml",
+    "pyannote.audio",
+    "python-dotenv",
 ]
 
 [dependency-groups]
