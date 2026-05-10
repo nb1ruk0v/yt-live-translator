@@ -2,6 +2,7 @@ import os
 import subprocess
 
 from pyannote.audio import Pipeline
+from pyannote.audio.pipelines.utils.hook import ProgressHook
 
 from segment import Segment
 
@@ -60,7 +61,8 @@ def diarize(video_path: str, segments: list[Segment], config: dict) -> list[Segm
         config["model"],
         token=token,
     )
-    annotation = pipeline(audio_path)
+    with ProgressHook() as hook:
+        annotation = pipeline(audio_path, hook=hook)
 
     intervals = [
         (turn.start, turn.end, speaker)
