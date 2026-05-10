@@ -1,6 +1,10 @@
 import os
 import subprocess
 
+from pyannote.audio import Pipeline
+
+from segment import Segment
+
 
 def _assign_speaker(
     seg_start: float,
@@ -39,3 +43,31 @@ def _ensure_audio(video_path: str) -> str:
         capture_output=True,
     )
     return audio_path
+
+
+def diarize(video_path: str, segments: list[Segment], config: dict) -> list[Segment]:
+    token_env = config.get("hf_token_env", "HUGGINGFACE_TOKEN")
+    token = os.environ.get(token_env)
+    if not token:
+        raise RuntimeError(
+            f"{token_env} not set. Add it to .env or export it before running"
+            " with diarization enabled."
+        )
+
+    audio_path = _ensure_audio(video_path)
+
+    pipeline = Pipeline.from_pretrained(
+        config["model"],
+        token=token,
+    )
+    annotation = pipeline(audio_path)
+
+    intervals = [
+        (turn.start, turn.end, speaker)
+        for turn, _, speaker in annotation.itertracks(yield_label=True)
+    ]
+
+    for seg in segments:
+        seg.speaker = _assign_speaker(seg.start, seg.end, intervals)
+
+    return segments
