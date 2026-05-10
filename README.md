@@ -33,7 +33,7 @@ ollama pull gemma4:e4b
 ollama serve
 ```
 
-The first run will additionally download the Silero model (~60 MB) into the `torch.hub` cache.
+The first run will additionally download the XTTS-v2 model (~1.8 GB) into the Coqui TTS cache and prompt for interactive consent to the CPML license — answer `y`.
 
 ## Pipeline
 
@@ -47,7 +47,9 @@ video.mp4 / URL
 [2] src/translate.py    Ollama /api/chat    translation to RU with N=3 history
     │                                       (Segment.translated)
     ▼
-[3] src/tts.py          Silero (v4_ru)      one WAV per segment
+[3] src/tts.py          Coqui XTTS-v2       voice cloning: reference clip
+    │                                       extracted from the input video,
+    │                                       one WAV per segment
     │                                       (Segment.audio_path/audio_duration)
     ▼
 [4] src/merge.py        ffmpeg-python       atempo stretch + atrim cap,
@@ -65,10 +67,13 @@ Russian translation is typically 20–50% longer than the original, so:
 
 1. **`src/translate.py`** — a length hint is added to the system prompt
    (`Keep the translation close to N characters`) so the LLM does not inflate the length itself.
-2. **`src/tts.py`** — Silero synthesizes a WAV; the actual duration is written into
-   `Segment.audio_duration`.
+2. **`src/tts.py`** — XTTS-v2 synthesizes a WAV (using a reference clip cloned from the
+   input video); the actual duration is written into `Segment.audio_duration`. **Known
+   regression:** XTTS-v2 on RU is markedly slower than the previous Silero backend — on
+   the test video 400/416 segments required `atempo` and 228s were truncated. See done
+   item `#10` for the planned mitigation (XTTS `speed` parameter / compaction-rewrite).
 3. **`src/merge.py`** — if `audio_duration > seg.duration`:
-   - `atempo` with the corresponding ratio, clamped at `ATEMPO_MAX = 1.25`
+   - `atempo` with the corresponding ratio, clamped at `ATEMPO_MAX = 1.5`
      (preserves pitch, speeds up the speech);
    - `atrim(duration=seg.duration)` as a safety cap — without it the tail bleeds
      into the next window and gets mixed by `amix` as a "second voice".
@@ -93,17 +98,21 @@ translation:
   ollama_url: "http://localhost:11434"
 
 tts:
-  model: "v4_ru"         # Silero RU bundle
+  model: "tts_models/multilingual/multi-dataset/xtts_v2"
   language: "ru"
-  speaker: "eugene"      # aidar | eugene | baya | kseniya | xenia
-  sample_rate: 48000
+  device: "cpu"          # cpu | cuda | mps
+  reference_seconds: 10  # length of the reference clip for voice cloning
 
 output:
   suffix: "_dubbed"
 ```
 
-**Changing the voice:** swap `speaker` in `config.yaml`. Silero does not support
-voice cloning — if you need that, look at F5-TTS / XTTS.
+**Voice:** cloned automatically from the first `reference_seconds` of the input
+video (`src/tts.py:_extract_reference`). The reference is saved as
+`<video>_ref.wav` next to the source and reused for every segment, so the
+Russian track inherits the original speaker's voice. To pin a fixed voice
+instead, swap `speaker_wav` in `synthesize` for a custom WAV. F5-TTS as an
+alternative backend was tried and shelved on the `experiment/tts-f5` branch.
 
 ## Stack
 
@@ -111,7 +120,7 @@ voice cloning — if you need that, look at F5-TTS / XTTS.
 |---|---|---|
 | Transcription | faster-whisper | Whisper, CPU, `int8` |
 | Translation | Ollama (`/api/chat`, `gemma4:e4b`) | Sliding-window history N=3, `temperature=0`, length hint |
-| Speech synthesis | Silero TTS (`v4_ru`) | RU, loaded via `torch.hub` from `snakers4/silero-models` |
+| Speech synthesis | Coqui XTTS-v2 (`coqui-tts`) | Voice cloning, multilingual (RU here); reference clip auto-extracted from the input video |
 | Mux | ffmpeg / ffmpeg-python | Audio extraction, atempo stretch, amix |
 | URL download | yt-dlp | Optional — only when the input is an http(s) URL |
 
