@@ -76,8 +76,12 @@ fi
 # Quote each positional arg with printf '%q' so word boundaries (esp. paths
 # with spaces) survive transit through ssh + bash -lc parsing.
 REMOTE_CMD=$(printf '%q ' "$@")
+# COQUI_TOS_AGREED=1 auto-accepts the Coqui CPML license (already accepted
+# interactively for local runs — see README "Installation"). Without it,
+# XTTS-v2's first-time model download blocks on an interactive prompt,
+# which an `ssh -t … bash -lc …` invocation can't satisfy.
 echo "==> Remote: $*"
-ssh -t "${REMOTE_HOST}" "bash -lc 'cd ${REMOTE_DIR} && ${REMOTE_CMD}'"
+ssh -t "${REMOTE_HOST}" "bash -lc 'cd ${REMOTE_DIR} && COQUI_TOS_AGREED=1 ${REMOTE_CMD}'"
 
 echo "==> rsync ${REMOTE_HOST}:${REMOTE_DIR}/data/ → ${VT_DATA_LOCAL}/"
 mkdir -p "${VT_DATA_LOCAL}"
