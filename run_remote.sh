@@ -73,8 +73,11 @@ if [[ "${SYNC_DATA}" == true ]]; then
     rsync -az --progress data/ "${REMOTE_HOST}:${REMOTE_DIR}/data/"
 fi
 
+# Quote each positional arg with printf '%q' so word boundaries (esp. paths
+# with spaces) survive transit through ssh + bash -lc parsing.
+REMOTE_CMD=$(printf '%q ' "$@")
 echo "==> Remote: $*"
-ssh -t "${REMOTE_HOST}" "bash -lc 'cd ${REMOTE_DIR} && $*'"
+ssh -t "${REMOTE_HOST}" "bash -lc 'cd ${REMOTE_DIR} && ${REMOTE_CMD}'"
 
 echo "==> rsync ${REMOTE_HOST}:${REMOTE_DIR}/data/ → ${VT_DATA_LOCAL}/"
 mkdir -p "${VT_DATA_LOCAL}"
