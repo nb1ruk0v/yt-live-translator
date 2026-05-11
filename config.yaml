@@ -1,6 +1,6 @@
 transcription:
   model: "turbo"
-  device: "mpsgjrf y"          # cpu, cuda, mps
+  device: "cpu"          # cpu, cuda, mps
   language: "en"       # auto = detect, или "en", "ru", etc.
 
 translation:
