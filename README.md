@@ -124,6 +124,48 @@ alternative backend was tried and shelved on the `experiment/tts-f5` branch.
 | Mux | ffmpeg / ffmpeg-python | Audio extraction, atempo stretch, amix |
 | URL download | yt-dlp | Optional — only when the input is an http(s) URL |
 
+## Remote run
+
+If the pipeline is too slow on your laptop, ship it to a GPU server via
+`run_remote.sh`. The script rsyncs the codebase, runs an arbitrary
+command over SSH, and pulls `data/` back.
+
+```bash
+# one-time: configure the server target
+cp .env.example .env           # if not already present
+# edit .env and set REMOTE_HOST=user@gpu-host (REMOTE_DIR defaults to ~/vt-claude)
+
+# run tests on the server
+./run_remote.sh uv run pytest
+
+# dub a local file (uploads data/ first)
+./run_remote.sh --sync-data uv run src/dub.py "data/my_video.mp4"
+
+# dub a URL (yt-dlp runs on the server, nothing to upload)
+./run_remote.sh uv run src/dub.py "https://www.youtube.com/watch?v=..."
+```
+
+**What the script syncs.** Code goes up via `rsync` with the usual
+excludes (`.git/`, `__pycache__/`, `.venv/`, caches, `experiments/`,
+`.DS_Store`). `.env` and `config.yaml` are also excluded — the server
+holds its own copies (typically with `device: cuda` in `config.yaml`
+and `HUGGINGFACE_TOKEN` in `.env`). `data/` only goes up with
+`--sync-data`. After the remote command finishes successfully, the
+script pulls `data/` back incrementally.
+
+**Server pre-requisites (one-time).**
+
+- `uv` and `ffmpeg` in `PATH`
+- `ollama serve` + `ollama pull gemma4:e4b`
+- NVIDIA driver and CUDA toolkit for `torch`
+- `git clone` this repo into `$REMOTE_DIR`, `uv sync`
+- copy `.env.example` to `.env` on the server, set `HUGGINGFACE_TOKEN`
+- copy `config.yaml` to the server and set `tts.device` / `transcription.device` to `cuda`
+
+**Recovery.** If the remote command fails, `data/` is not pulled back.
+Run `./run_remote.sh true` (or any no-op) to trigger only the
+download phase against the current server state.
+
 ## Tests
 
 ```bash
