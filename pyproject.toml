@@ -15,12 +15,26 @@ dependencies = [
     "pyyaml",
     "pyannote.audio",
     "python-dotenv",
-    "nvidia-cublas-cu12; sys_platform == 'linux'",
-    "nvidia-cudnn-cu12; sys_platform == 'linux'",
 ]
 
 [dependency-groups]
 dev = ["pytest>=7.0", "ruff>=0.6", "pre-commit>=3.7"]
+
+# On Linux, pull torch from PyTorch's CUDA 12.8 wheel index instead of the
+# CUDA 13 wheels on PyPI. Reason: ctranslate2 (inside faster-whisper) only
+# links against libcublas.so.12, and CUDA 13 torch's nvrtc-builtins.so.13
+# dlopen path isn't visible at runtime — so JIT-compiled GPU kernels fail.
+# CU12.8 torch ships a self-consistent CUDA 12 stack (cublas, cudnn, nvrtc)
+# that both ctranslate2 and pyannote use happily. Mac is unaffected
+# (default PyPI torch with MPS).
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux'" }]
+torchaudio = [{ index = "pytorch-cu128", marker = "sys_platform == 'linux'" }]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
