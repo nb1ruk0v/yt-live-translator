@@ -1,6 +1,7 @@
 import os
 import subprocess
 
+import torch
 from pyannote.audio import Pipeline
 from pyannote.audio.pipelines.utils.hook import ProgressHook
 
@@ -61,6 +62,7 @@ def diarize(video_path: str, segments: list[Segment], config: dict) -> list[Segm
         config["model"],
         token=token,
     )
+    pipeline.to(torch.device(config.get("device", "cpu")))
     with ProgressHook() as hook:
         result = pipeline(audio_path, hook=hook)
 
