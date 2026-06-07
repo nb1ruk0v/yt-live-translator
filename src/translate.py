@@ -40,15 +40,26 @@ def _clean(text: str) -> str:
     return text
 
 
-def _build_system(target_chars: int) -> str:
+def _build_system(target_chars: int, context: str = "") -> str:
+    base = SYSTEM_PROMPT
+    if context.strip():
+        base += (
+            "\n\nHere is the topic summary and glossary for consistent "
+            f"terminology:\n{context.strip()}\n"
+            "Use the glossary translations consistently."
+        )
     return (
-        SYSTEM_PROMPT + f" Keep the translation close to {target_chars} characters "
+        base + f" Keep the translation close to {target_chars} characters "
         "(±20%). Prefer shorter wording; drop filler if needed."
     )
 
 
-def _build_messages(seg_original: str, history: list[tuple[str, str]]) -> list[dict]:
-    messages: list[dict] = [{"role": "system", "content": _build_system(len(seg_original))}]
+def _build_messages(
+    seg_original: str, history: list[tuple[str, str]], context: str = ""
+) -> list[dict]:
+    messages: list[dict] = [
+        {"role": "system", "content": _build_system(len(seg_original), context)}
+    ]
     for orig, trans in history:
         messages.append({"role": "user", "content": orig})
         messages.append({"role": "assistant", "content": trans})
@@ -56,7 +67,7 @@ def _build_messages(seg_original: str, history: list[tuple[str, str]]) -> list[d
     return messages
 
 
-def translate(segments: list[Segment], config: dict) -> list[Segment]:
+def translate(segments: list[Segment], config: dict, context: str = "") -> list[Segment]:
     history: list[tuple[str, str]] = []
 
     for seg in segments:
@@ -64,7 +75,7 @@ def translate(segments: list[Segment], config: dict) -> list[Segment]:
             seg.translated = ""
             continue
 
-        messages = _build_messages(seg.original, history[-CONTEXT_WINDOW:])
+        messages = _build_messages(seg.original, history[-CONTEXT_WINDOW:], context)
         # TODO: вынести HTTP-вызов Ollama в отдельный инфра-слой (LLMClient/OllamaClient).
         # Сейчас бизнес-логика перевода (промптинг, history, fallback) смешана с транспортом
         # (URL, timeout, JSON-парсинг). Разнести — упростит замену провайдера и моки в тестах.

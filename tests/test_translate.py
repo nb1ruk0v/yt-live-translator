@@ -293,3 +293,26 @@ def test_translate_raises_on_http_error(mock_post):
     segments = [Segment(start=0.0, end=1.0, original="Test")]
     with pytest.raises(requests.exceptions.HTTPError):
         translate(segments, FAKE_CONFIG)
+
+
+@patch("translate.requests.post")
+def test_translate_injects_context_into_system_prompt(mock_post):
+    mock_post.return_value = _mock_chat_response("Текст")
+    segments = [Segment(start=0.0, end=1.0, original="Test")]
+    context = "# Glossary\n| GPT | Джи-Пи-Ти |"
+
+    translate(segments, FAKE_CONFIG, context=context)
+
+    system = mock_post.call_args[1]["json"]["messages"][0]["content"]
+    assert "Джи-Пи-Ти" in system
+
+
+@patch("translate.requests.post")
+def test_translate_no_context_keeps_old_system_prompt(mock_post):
+    mock_post.return_value = _mock_chat_response("Текст")
+    segments = [Segment(start=0.0, end=1.0, original="Test")]
+
+    translate(segments, FAKE_CONFIG)
+
+    system = mock_post.call_args[1]["json"]["messages"][0]["content"]
+    assert "glossary" not in system.lower()
