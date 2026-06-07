@@ -37,6 +37,6 @@ def build_glossary(segments: list[Segment], config: dict, out_path: str) -> str:
     response.raise_for_status()
     md = response.json()["message"]["content"].strip()
 
-    with open(out_path, "w") as f:
+    with open(out_path, "w", encoding="utf-8") as f:
         f.write(md)
     return md
