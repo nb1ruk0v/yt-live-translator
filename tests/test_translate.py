@@ -121,6 +121,18 @@ def test_translate_sets_temperature_zero(mock_post):
 
 
 @patch("translate.requests.post")
+def test_translate_caps_num_predict(mock_post):
+    """Guard the output cap that keeps a single request from running away."""
+    mock_post.return_value = _mock_chat_response("Тест")
+    segments = [Segment(start=0.0, end=1.0, original="Test")]
+
+    translate(segments, FAKE_CONFIG)
+
+    call_json = mock_post.call_args[1]["json"]
+    assert call_json["options"]["num_predict"] == 512
+
+
+@patch("translate.requests.post")
 def test_translate_disables_stream(mock_post):
     mock_post.return_value = _mock_chat_response("Тест")
     segments = [Segment(start=0.0, end=1.0, original="Test")]

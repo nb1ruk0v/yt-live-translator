@@ -74,9 +74,9 @@ def translate(segments: list[Segment], config: dict) -> list[Segment]:
                 "model": config["model"],
                 "messages": messages,
                 "stream": False,
-                "options": {"temperature": 0},
+                "options": {"temperature": 0, "num_predict": 512},
             },
-            timeout=120,
+            timeout=600,
         )
         response.raise_for_status()
         raw = response.json()["message"]["content"]
