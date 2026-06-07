@@ -49,6 +49,7 @@ FAKE_CONFIG_DIARIZATION_DISABLED = {
 @patch("dub.write_srt")
 @patch("dub.merge")
 @patch("dub.synthesize")
+@patch("dub.build_glossary")
 @patch("dub.translate")
 @patch("dub.transcribe")
 @patch("dub.check_prerequisites")
@@ -60,12 +61,14 @@ def test_main_full_pipeline(
     mock_check,
     mock_transcribe,
     mock_translate,
+    mock_build_glossary,
     mock_synthesize,
     mock_merge,
     mock_write_srt,
 ):
     mock_config.return_value = FAKE_CONFIG_DIARIZATION_DISABLED
     mock_transcribe.return_value = FAKE_SEGMENTS
+    mock_build_glossary.return_value = "# Glossary\nstub"
     mock_translate.return_value = FAKE_SEGMENTS
     mock_synthesize.return_value = FAKE_SEGMENTS
     mock_merge.return_value = "/tmp/video_dubbed.mp4"
@@ -75,8 +78,9 @@ def test_main_full_pipeline(
         dub.main()
 
     mock_transcribe.assert_called_once()
+    mock_build_glossary.assert_called_once()
     mock_translate.assert_called_once_with(
-        FAKE_SEGMENTS, FAKE_CONFIG_DIARIZATION_DISABLED["translation"]
+        FAKE_SEGMENTS, FAKE_CONFIG_DIARIZATION_DISABLED["translation"], "# Glossary\nstub"
     )
     mock_synthesize.assert_called_once_with(
         FAKE_SEGMENTS, FAKE_CONFIG_DIARIZATION_DISABLED["tts"], "/tmp/video.mp4"
@@ -104,6 +108,7 @@ def test_main_exits_if_file_not_found(mock_exists, mock_config):
 @patch("dub.write_srt")
 @patch("dub.merge")
 @patch("dub.synthesize")
+@patch("dub.build_glossary")
 @patch("dub.translate")
 @patch("dub.diarize")
 @patch("dub.transcribe")
@@ -118,6 +123,7 @@ def test_main_runs_diarize_when_enabled(
     mock_transcribe,
     mock_diarize,
     mock_translate,
+    mock_build_glossary,
     mock_synthesize,
     mock_merge,
     mock_write_srt,
@@ -125,6 +131,7 @@ def test_main_runs_diarize_when_enabled(
     mock_config.return_value = FAKE_CONFIG_WITH_DIARIZATION
     mock_transcribe.return_value = FAKE_SEGMENTS
     mock_diarize.return_value = FAKE_SEGMENTS
+    mock_build_glossary.return_value = "# Glossary\nstub"
     mock_translate.return_value = FAKE_SEGMENTS
     mock_synthesize.return_value = FAKE_SEGMENTS
     mock_merge.return_value = "/tmp/video_dubbed.mp4"
@@ -141,6 +148,7 @@ def test_main_runs_diarize_when_enabled(
 @patch("dub.write_srt")
 @patch("dub.merge")
 @patch("dub.synthesize")
+@patch("dub.build_glossary")
 @patch("dub.translate")
 @patch("dub.diarize")
 @patch("dub.transcribe")
@@ -154,12 +162,14 @@ def test_main_skips_diarize_when_disabled(
     mock_transcribe,
     mock_diarize,
     mock_translate,
+    mock_build_glossary,
     mock_synthesize,
     mock_merge,
     mock_write_srt,
 ):
     mock_config.return_value = FAKE_CONFIG_DIARIZATION_DISABLED
     mock_transcribe.return_value = FAKE_SEGMENTS
+    mock_build_glossary.return_value = "# Glossary\nstub"
     mock_translate.return_value = FAKE_SEGMENTS
     mock_synthesize.return_value = FAKE_SEGMENTS
     mock_merge.return_value = "/tmp/video_dubbed.mp4"

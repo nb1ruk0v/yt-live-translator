@@ -9,6 +9,7 @@ import yaml
 from dotenv import load_dotenv
 
 from diarize import diarize
+from glossary import build_glossary
 from merge import merge
 from subtitles import write_srt
 from transcribe import transcribe
@@ -105,7 +106,7 @@ def main() -> None:
     check_prerequisites(config)
 
     diar_enabled = config.get("diarization", {}).get("enabled", False)
-    total = 6 if diar_enabled else 5
+    total = 7 if diar_enabled else 6
     step = 1
 
     print(f"[{step}/{total}] Transcribing...")
@@ -120,8 +121,14 @@ def main() -> None:
         print(f"      Speakers: {', '.join(speakers) or '(none)'}")
         step += 1
 
+    print(f"[{step}/{total}] Building glossary...")
+    glossary_path = str(Path(video_path).with_name(Path(video_path).stem + "_glossary.md"))
+    context = build_glossary(segments, config["translation"], glossary_path)
+    print(f"      {'saved ' + glossary_path if context else 'skipped (empty/failed)'}")
+    step += 1
+
     print(f"[{step}/{total}] Translating...")
-    segments = translate(segments, config["translation"])
+    segments = translate(segments, config["translation"], context)
     step += 1
 
     print(f"[{step}/{total}] Synthesizing speech...")
