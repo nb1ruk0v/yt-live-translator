@@ -78,7 +78,9 @@ def test_main_full_pipeline(
         dub.main()
 
     mock_transcribe.assert_called_once()
-    mock_build_glossary.assert_called_once()
+    mock_build_glossary.assert_called_once_with(
+        FAKE_SEGMENTS, FAKE_CONFIG_DIARIZATION_DISABLED["translation"], "/tmp/video_glossary.md"
+    )
     mock_translate.assert_called_once_with(
         FAKE_SEGMENTS, FAKE_CONFIG_DIARIZATION_DISABLED["translation"], "# Glossary\nstub"
     )

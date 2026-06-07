@@ -122,9 +122,11 @@ def main() -> None:
         step += 1
 
     print(f"[{step}/{total}] Building glossary...")
-    glossary_path = str(Path(video_path).with_name(Path(video_path).stem + "_glossary.md"))
+    p = Path(video_path)
+    glossary_path = str(p.with_name(p.stem + "_glossary.md"))
     context = build_glossary(segments, config["translation"], glossary_path)
-    print(f"      {'saved ' + glossary_path if context else 'skipped (empty/failed)'}")
+    status = f"saved {glossary_path}" if context else "skipped (empty/failed)"
+    print(f"      {status}")
     step += 1
 
     print(f"[{step}/{total}] Translating...")
