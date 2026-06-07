@@ -91,6 +91,7 @@ def merge(video_path: str, segments: list[Segment], suffix: str) -> str:
     truncated_total = 0.0
     extended_total = 0.0
     for i, (seg, plan) in enumerate(zip(segments, plans)):
+        # window span mirrors plan_timeline; merge needs raw w to compute the setpts factor
         w_end = segments[i + 1].start if i + 1 < len(segments) else video_total
         w = w_end - seg.start
 
@@ -98,7 +99,7 @@ def merge(video_path: str, segments: list[Segment], suffix: str) -> str:
             piece = vinput.video.filter("trim", start=seg.start, end=seg.start + w)
             if plan.target_dur > w:
                 factor = plan.target_dur / w
-                piece = piece.filter("setpts", f"PTS*{factor:.6f}")
+                piece = piece.filter("setpts", f"(PTS-STARTPTS)*{factor:.6f}")
                 extended_total += plan.target_dur - w
             else:
                 piece = piece.filter("setpts", "PTS-STARTPTS")
@@ -111,11 +112,11 @@ def merge(video_path: str, segments: list[Segment], suffix: str) -> str:
             stream = stream.filter("atrim", duration=plan.target_dur)
             overflow_count += 1
             truncated_total += plan.truncated
-        if plan.video_speed < 1.0:
+        if plan.video_speed < 1.0 or plan.truncated > 0:
+            trunc_note = f", truncated {plan.truncated:.2f}s" if plan.truncated > 0 else ""
             print(
                 f"      seg {i:3d}: audio {seg.audio_duration:5.2f}s, "
-                f"vspeed={plan.video_speed:.2f}, atempo={plan.audio_tempo:.2f}, "
-                f"truncated {plan.truncated:.2f}s"
+                f"vspeed={plan.video_speed:.2f}, atempo={plan.audio_tempo:.2f}{trunc_note}"
             )
         delay_ms = int(plan.new_start * 1000)
         stream = stream.filter("adelay", f"{delay_ms}|{delay_ms}")

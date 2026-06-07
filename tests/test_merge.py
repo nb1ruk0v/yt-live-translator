@@ -72,10 +72,6 @@ def test_merge_no_filters_when_audio_fits_window(mock_ffmpeg):
     assert "atempo" not in names
 
 
-def _video_filters(video_chain):
-    return [c.args[0] for c in video_chain.filter.call_args_list]
-
-
 @patch("merge.ffmpeg")
 def test_merge_slows_video_when_audio_overflows(mock_ffmpeg):
     # seg0 [0,2) w=2 with a=3.0 → video slowed (setpts factor target/w), audio at soft cap, no atrim
@@ -83,9 +79,9 @@ def test_merge_slows_video_when_audio_overflows(mock_ffmpeg):
     segs = [_seg(0.0, 2.0, 3.0), _seg(2.0, 4.0, 1.0)]
     merge("/videos/test.mp4", segs, "_dubbed")
 
-    # video was slowed: a setpts call carries a multiplying factor (PTS*...)
+    # video was slowed: a setpts call carries the timestamp-resetting form (PTS-STARTPTS)*factor
     setpts_args = [c.args[1] for c in video_chain.filter.call_args_list if c.args[0] == "setpts"]
-    assert any("PTS*" in str(a) for a in setpts_args)
+    assert any(str(a).startswith("(PTS-STARTPTS)*") for a in setpts_args)
     # audio softly sped, not trimmed (target exactly fits the sped audio)
     anames = _filter_names(audio_chain)
     assert "atempo" in anames
