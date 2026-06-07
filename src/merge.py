@@ -43,9 +43,26 @@ def _plan_segment(a: float, w: float) -> SegmentPlan:
     return SegmentPlan(tempo, VIDEO_MIN, target, 0.0, truncated)
 
 
-def plan_timeline(segments: list) -> list[SegmentPlan]:
-    """Placeholder — implemented in Task 2."""
-    raise NotImplementedError
+def plan_timeline(segments: list[Segment], video_total: float) -> list[SegmentPlan]:
+    """Per-segment fit plan with cumulative output offsets.
+
+    `cursor` is the running position in the rebuilt timeline; it is monotonically
+    non-decreasing because `_plan_segment` never returns target_dur < w (windows
+    expand or stay the same, never shrink). `w` is the segment's *original* video
+    span, which is what gets stretched — so it is measured off `seg.start`, not `cursor`.
+    """
+    plans: list[SegmentPlan] = []
+    if not segments:
+        return plans
+    cursor = segments[0].start  # preroll plays at normal speed before the first segment
+    for i, seg in enumerate(segments):
+        w_end = segments[i + 1].start if i + 1 < len(segments) else video_total
+        w = w_end - seg.start  # original window span (gets stretched, not the cursor)
+        plan = _plan_segment(seg.audio_duration, w)
+        plan.new_start = cursor
+        cursor += plan.target_dur
+        plans.append(plan)
+    return plans
 
 
 def merge(video_path: str, segments: list[Segment], suffix: str) -> str:

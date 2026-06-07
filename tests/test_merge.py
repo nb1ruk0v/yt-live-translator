@@ -6,6 +6,7 @@ from merge import (
     VIDEO_MIN,
     _plan_segment,
     merge,
+    plan_timeline,
 )
 from segment import Segment
 
@@ -252,3 +253,45 @@ def test_plan_segment_nonpositive_window_overflows():
     assert p.target_dur == 0.0
     assert p.video_speed == 1.0
     assert p.audio_tempo == 1.0
+
+
+def _seg(start, end, a):
+    return Segment(
+        start=start,
+        end=end,
+        original="x",
+        translated="ы",
+        audio_path="/tmp/x.wav",
+        audio_duration=a,
+    )
+
+
+def test_plan_timeline_cumulative_new_start():
+    # seg0 window [0,3) w=3 fits a=1.8 → target 3; seg1 last window [3,5) w=2 fits a=1.5 → target 2
+    segs = [_seg(0.0, 2.0, 1.8), _seg(3.0, 5.0, 1.5)]
+    plans = plan_timeline(segs, video_total=5.0)
+    assert plans[0].new_start == 0.0
+    assert plans[0].target_dur == 3.0
+    assert plans[1].new_start == 3.0  # 0 + target_dur[0]
+
+
+def test_plan_timeline_slowdown_shifts_later_segments():
+    # seg0 [0,2) w=2 with a=3.0: audio capped at AUDIO_SOFT, video slowed (vspeed~0.83),
+    # so target = needed = 3/AUDIO_SOFT = 2.4
+    # seg1 must start at 2.4, not at its original 2.0
+    segs = [_seg(0.0, 2.0, 3.0), _seg(2.0, 4.0, 1.0)]
+    plans = plan_timeline(segs, video_total=4.0)
+    assert abs(plans[0].target_dur - 3.0 / AUDIO_SOFT) < 1e-6
+    assert abs(plans[1].new_start - 3.0 / AUDIO_SOFT) < 1e-6
+
+
+def test_plan_timeline_last_window_uses_video_total():
+    # single segment, window = video_total - start = 4.0; a=3.0 fits → no stretch
+    plans = plan_timeline([_seg(1.0, 2.0, 3.0)], video_total=5.0)
+    assert plans[0].target_dur == 4.0
+    assert plans[0].new_start == 1.0  # preroll offset preserved
+    assert plans[0].video_speed == 1.0
+
+
+def test_plan_timeline_empty():
+    assert plan_timeline([], video_total=5.0) == []
