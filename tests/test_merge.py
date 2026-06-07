@@ -201,3 +201,16 @@ def test_plan_timeline_last_window_uses_video_total():
 
 def test_plan_timeline_empty():
     assert plan_timeline([], video_total=5.0) == []
+
+
+@patch("merge.ffmpeg")
+def test_merge_last_segment_overflow_is_slowed(mock_ffmpeg):
+    # single segment whose audio (3.0s) overflows its window [0, video_total=2.0]:
+    # the last window is now bounded by video_total and participates in the cascade,
+    # so the video is slowed (setpts factor) rather than left untouched.
+    audio_chain, video_chain = _setup(mock_ffmpeg, video_total=2.0)
+    segs = [_seg(0.0, 1.0, 3.0)]
+    merge("/videos/test.mp4", segs, "_dubbed")
+
+    setpts_args = [c.args[1] for c in video_chain.filter.call_args_list if c.args[0] == "setpts"]
+    assert any(str(a).startswith("(PTS-STARTPTS)*") for a in setpts_args)

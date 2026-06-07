@@ -128,7 +128,9 @@ def merge(video_path: str, segments: list[Segment], suffix: str) -> str:
             f"{overflow_count} segments truncated {truncated_total:.2f}s total"
         )
 
-    if len(video_pieces) == 1:
+    if not video_pieces:
+        video_out = vinput.video
+    elif len(video_pieces) == 1:
         video_out = video_pieces[0]
     else:
         video_out = ffmpeg.concat(*video_pieces, v=1, a=0)
