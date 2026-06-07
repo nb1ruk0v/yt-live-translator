@@ -45,6 +45,10 @@ def build_glossary(segments: list[Segment], config: dict, out_path: str) -> str:
         )
         return ""
 
-    with open(out_path, "w", encoding="utf-8") as f:
-        f.write(md)
+    try:
+        with open(out_path, "w", encoding="utf-8") as f:
+            f.write(md)
+    except OSError as e:
+        # Saving the .md is best-effort; the context is still usable in memory.
+        print(f"[glossary] warning: could not save {out_path} ({e})", file=sys.stderr)
     return md

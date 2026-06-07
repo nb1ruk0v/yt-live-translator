@@ -79,3 +79,16 @@ def test_build_glossary_llm_error_returns_empty(mock_post, tmp_path):
     result = build_glossary(segments, FAKE_CONFIG, str(tmp_path / "g.md"))
 
     assert result == ""
+
+
+@patch("glossary.requests.post")
+def test_build_glossary_returns_md_even_if_save_fails(mock_post, tmp_path):
+    # LLM succeeded → context is usable in memory; a failed file write must not
+    # crash the pipeline and must not discard the context.
+    mock_post.return_value = _mock_chat_response(MD)
+    segments = [Segment(start=0.0, end=1.0, original="Test")]
+
+    with patch("builtins.open", side_effect=OSError("disk full")):
+        result = build_glossary(segments, FAKE_CONFIG, str(tmp_path / "g.md"))
+
+    assert result == MD
