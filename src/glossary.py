@@ -1,3 +1,5 @@
+import sys
+
 import requests
 
 from segment import Segment
@@ -21,21 +23,27 @@ def build_glossary(segments: list[Segment], config: dict, out_path: str) -> str:
     if not text:
         return ""
 
-    response = requests.post(
-        f"{config['ollama_url']}/api/chat",
-        json={
-            "model": config["model"],
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": text},
-            ],
-            "stream": False,
-            "options": {"temperature": 0, "num_predict": 1024},
-        },
-        timeout=600,
-    )
-    response.raise_for_status()
-    md = response.json()["message"]["content"].strip()
+    try:
+        response = requests.post(
+            f"{config['ollama_url']}/api/chat",
+            json={
+                "model": config["model"],
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": text},
+                ],
+                "stream": False,
+                "options": {"temperature": 0, "num_predict": 1024},
+            },
+            timeout=600,
+        )
+        response.raise_for_status()
+        md = response.json()["message"]["content"].strip()
+    except Exception as e:  # noqa: BLE001 — pipeline must not die on glossary
+        print(
+            f"[glossary] warning: build failed ({e}); continuing without context", file=sys.stderr
+        )
+        return ""
 
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(md)

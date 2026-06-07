@@ -56,3 +56,26 @@ def test_build_glossary_hits_chat_endpoint_with_config_model(mock_post, tmp_path
     assert mock_post.call_args[0][0].endswith("/api/chat")
     assert mock_post.call_args[1]["json"]["model"] == "mistral:7b"
     assert mock_post.call_args[1]["json"]["options"]["temperature"] == 0
+
+
+def test_build_glossary_empty_segments_returns_empty(tmp_path):
+    result = build_glossary([], FAKE_CONFIG, str(tmp_path / "g.md"))
+    assert result == ""
+
+
+def test_build_glossary_blank_originals_returns_empty(tmp_path):
+    segments = [Segment(start=0.0, end=1.0, original="   ")]
+    result = build_glossary(segments, FAKE_CONFIG, str(tmp_path / "g.md"))
+    assert result == ""
+
+
+@patch("glossary.requests.post")
+def test_build_glossary_llm_error_returns_empty(mock_post, tmp_path):
+    import requests as _requests
+
+    mock_post.side_effect = _requests.RequestException("boom")
+    segments = [Segment(start=0.0, end=1.0, original="Test")]
+
+    result = build_glossary(segments, FAKE_CONFIG, str(tmp_path / "g.md"))
+
+    assert result == ""
