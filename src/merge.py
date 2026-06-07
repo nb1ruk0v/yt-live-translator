@@ -69,51 +69,70 @@ def merge(video_path: str, segments: list[Segment], suffix: str) -> str:
     input_path = Path(video_path)
     output_path = input_path.with_name(f"{input_path.stem}{suffix}{input_path.suffix}")
 
-    video = ffmpeg.input(video_path).video
+    if not segments:
+        vinput = ffmpeg.input(video_path)
+        ffmpeg.output(vinput.video, str(output_path)).overwrite_output().run(
+            capture_stdout=True, capture_stderr=True
+        )
+        return str(output_path)
+
+    video_total = float(ffmpeg.probe(video_path)["format"]["duration"])
+    vinput = ffmpeg.input(video_path)
+    plans = plan_timeline(segments, video_total)
+
+    video_pieces = []
+    if segments[0].start > 0:
+        pre = vinput.video.filter("trim", start=0, end=segments[0].start)
+        pre = pre.filter("setpts", "PTS-STARTPTS")
+        video_pieces.append(pre)
 
     audio_streams = []
     overflow_count = 0
     truncated_total = 0.0
-    for i, seg in enumerate(segments):
+    extended_total = 0.0
+    for i, (seg, plan) in enumerate(zip(segments, plans)):
+        w_end = segments[i + 1].start if i + 1 < len(segments) else video_total
+        w = w_end - seg.start
+
+        if plan.target_dur > 0 and w > 0:
+            piece = vinput.video.filter("trim", start=seg.start, end=seg.start + w)
+            if plan.target_dur > w:
+                factor = plan.target_dur / w
+                piece = piece.filter("setpts", f"PTS*{factor:.6f}")
+                extended_total += plan.target_dur - w
+            else:
+                piece = piece.filter("setpts", "PTS-STARTPTS")
+            video_pieces.append(piece)
+
         stream = ffmpeg.input(seg.audio_path).audio
-
-        is_last = i + 1 >= len(segments)
-        effective_window = None if is_last else segments[i + 1].start - seg.start
-
-        if (
-            effective_window is not None
-            and effective_window > 0
-            and seg.audio_duration > effective_window
-        ):
-            ratio = seg.audio_duration / effective_window
-            tempo = min(ATEMPO_MAX, ratio)
-            stretched = seg.audio_duration / tempo
-            truncated = max(0.0, stretched - effective_window)
+        if plan.audio_tempo > 1.0:
+            stream = stream.filter("atempo", plan.audio_tempo)
+        if plan.truncated > 0:
+            stream = stream.filter("atrim", duration=plan.target_dur)
             overflow_count += 1
-            truncated_total += truncated
+            truncated_total += plan.truncated
+        if plan.video_speed < 1.0:
             print(
-                f"      seg {i:3d}: audio {seg.audio_duration:5.2f}s > "
-                f"window {effective_window:5.2f}s, atempo={tempo:.2f}, "
-                f"truncated {truncated:.2f}s"
+                f"      seg {i:3d}: audio {seg.audio_duration:5.2f}s, "
+                f"vspeed={plan.video_speed:.2f}, atempo={plan.audio_tempo:.2f}, "
+                f"truncated {plan.truncated:.2f}s"
             )
-            stream = stream.filter("atempo", tempo)
-            stream = stream.filter("atrim", duration=effective_window)
-
-        delay_ms = int(seg.start * 1000)
+        delay_ms = int(plan.new_start * 1000)
         stream = stream.filter("adelay", f"{delay_ms}|{delay_ms}")
         audio_streams.append(stream)
 
-    if overflow_count:
+    if extended_total or truncated_total:
         print(
-            f"      {overflow_count}/{len(segments)} segments stretched, "
-            f"{truncated_total:.2f}s total truncated"
+            f"      video extended +{extended_total:.2f}s, "
+            f"{overflow_count} segments truncated {truncated_total:.2f}s total"
         )
 
-    if audio_streams:
-        mixed = ffmpeg.filter(audio_streams, "amix", inputs=len(audio_streams), normalize=0)
-        out = ffmpeg.output(video, mixed, str(output_path))
+    if len(video_pieces) == 1:
+        video_out = video_pieces[0]
     else:
-        out = ffmpeg.output(video, str(output_path))
+        video_out = ffmpeg.concat(*video_pieces, v=1, a=0)
 
+    mixed = ffmpeg.filter(audio_streams, "amix", inputs=len(audio_streams), normalize=0)
+    out = ffmpeg.output(video_out, mixed, str(output_path))
     out.overwrite_output().run(capture_stdout=True, capture_stderr=True)
     return str(output_path)

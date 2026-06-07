@@ -32,18 +32,23 @@ def make_segments():
     ]
 
 
-def _setup(mock_ffmpeg):
-    """Self-returning filter chain so all filter calls land on one mock."""
+def _setup(mock_ffmpeg, video_total=20.0):
+    """Self-returning audio + video chains so all filter calls land on one mock each."""
     audio_chain = MagicMock()
     audio_chain.filter.return_value = audio_chain
+    video_chain = MagicMock()
+    video_chain.filter.return_value = video_chain
     input_mock = MagicMock()
     input_mock.audio = audio_chain
+    input_mock.video = video_chain
     mock_ffmpeg.input.return_value = input_mock
+    mock_ffmpeg.probe.return_value = {"format": {"duration": str(video_total)}}
+    mock_ffmpeg.concat.return_value = MagicMock()
     mock_ffmpeg.filter.return_value = MagicMock()
     mock_out = MagicMock()
     mock_ffmpeg.output.return_value = mock_out
     mock_out.overwrite_output.return_value = mock_out
-    return audio_chain
+    return audio_chain, video_chain
 
 
 def _filter_names(audio_chain):
@@ -59,152 +64,57 @@ def test_merge_returns_output_path_with_suffix(mock_ffmpeg):
 
 @patch("merge.ffmpeg")
 def test_merge_no_filters_when_audio_fits_window(mock_ffmpeg):
-    chain = _setup(mock_ffmpeg)
+    # video_total=20 → both segments' windows easily fit their audio
+    audio_chain, _ = _setup(mock_ffmpeg, video_total=20.0)
     merge("/videos/test.mp4", make_segments(), "_dubbed")
-    names = _filter_names(chain)
+    names = _filter_names(audio_chain)
     assert "atrim" not in names
     assert "atempo" not in names
 
 
-@patch("merge.ffmpeg")
-def test_merge_atrim_caps_at_effective_window_not_seg_duration(mock_ffmpeg):
-    """Regression guard: cap MUST be next.start-this.start, not this.end-this.start.
-
-    seg.duration = 1.0; effective_window = 2.0 (gap of 1s before next).
-    Old code would cap at 1.0, new code caps at 2.0.
-    """
-    chain = _setup(mock_ffmpeg)
-    segs = [
-        Segment(
-            start=0.0,
-            end=1.0,
-            original="Hi",
-            translated="Привет",
-            audio_path="/tmp/x.wav",
-            audio_duration=3.0,
-        ),
-        Segment(
-            start=2.0,
-            end=3.0,
-            original="Bye",
-            translated="Пока",
-            audio_path="/tmp/y.wav",
-            audio_duration=0.5,
-        ),
-    ]
-    merge("/videos/test.mp4", segs, "_dubbed")
-
-    atrim_calls = [c for c in chain.filter.call_args_list if c.args[0] == "atrim"]
-    assert len(atrim_calls) == 1
-    assert atrim_calls[0].kwargs == {"duration": 2.0}
+def _video_filters(video_chain):
+    return [c.args[0] for c in video_chain.filter.call_args_list]
 
 
 @patch("merge.ffmpeg")
-def test_merge_atempo_ratio_under_cap(mock_ffmpeg):
-    chain = _setup(mock_ffmpeg)
-    segs = [
-        Segment(
-            start=0.0,
-            end=2.0,
-            original="Hi",
-            translated="Привет",
-            audio_path="/tmp/x.wav",
-            audio_duration=2.2,
-        ),
-        Segment(
-            start=2.0,
-            end=3.0,
-            original="Bye",
-            translated="Пока",
-            audio_path="/tmp/y.wav",
-            audio_duration=0.5,
-        ),
-    ]
+def test_merge_slows_video_when_audio_overflows(mock_ffmpeg):
+    # seg0 [0,2) w=2 with a=3.0 → video slowed (setpts factor target/w), audio at soft cap, no atrim
+    audio_chain, video_chain = _setup(mock_ffmpeg, video_total=4.0)
+    segs = [_seg(0.0, 2.0, 3.0), _seg(2.0, 4.0, 1.0)]
     merge("/videos/test.mp4", segs, "_dubbed")
 
-    atempo_calls = [c for c in chain.filter.call_args_list if c.args[0] == "atempo"]
-    assert len(atempo_calls) == 1
-    # ratio = 2.2 / 2.0 = 1.1, under cap
-    assert abs(atempo_calls[0].args[1] - 1.1) < 1e-6
+    # video was slowed: a setpts call carries a multiplying factor (PTS*...)
+    setpts_args = [c.args[1] for c in video_chain.filter.call_args_list if c.args[0] == "setpts"]
+    assert any("PTS*" in str(a) for a in setpts_args)
+    # audio softly sped, not trimmed (target exactly fits the sped audio)
+    anames = _filter_names(audio_chain)
+    assert "atempo" in anames
+    assert "atrim" not in anames
 
 
 @patch("merge.ffmpeg")
-def test_merge_atempo_clamped_to_upper(mock_ffmpeg):
-    """Regression guard: ratio above ATEMPO_MAX is clamped to the cap."""
-    chain = _setup(mock_ffmpeg)
-    segs = [
-        Segment(
-            start=0.0,
-            end=2.0,
-            original="Hi",
-            translated="Привет",
-            audio_path="/tmp/x.wav",
-            audio_duration=10.0,
-        ),
-        Segment(
-            start=2.0,
-            end=3.0,
-            original="Bye",
-            translated="Пока",
-            audio_path="/tmp/y.wav",
-            audio_duration=0.5,
-        ),
-    ]
+def test_merge_trims_only_on_truncation(mock_ffmpeg):
+    # huge deficit on seg0 → video floored, audio at ATEMPO_MAX, tail trimmed → atrim present
+    audio_chain, _ = _setup(mock_ffmpeg, video_total=4.0)
+    segs = [_seg(0.0, 2.0, 10.0), _seg(2.0, 4.0, 0.5)]
     merge("/videos/test.mp4", segs, "_dubbed")
 
-    atempo_calls = [c for c in chain.filter.call_args_list if c.args[0] == "atempo"]
-    assert len(atempo_calls) == 1
+    atempo_calls = [c for c in audio_chain.filter.call_args_list if c.args[0] == "atempo"]
+    atrim_calls = [c for c in audio_chain.filter.call_args_list if c.args[0] == "atrim"]
     assert abs(atempo_calls[0].args[1] - ATEMPO_MAX) < 1e-6
+    assert len(atrim_calls) == 1  # only the truncated segment is capped
 
 
 @patch("merge.ffmpeg")
-def test_merge_uses_gap_to_next_segment_as_window(mock_ffmpeg):
-    """Audio longer than seg.duration but fits in gap before next → no stretch."""
-    chain = _setup(mock_ffmpeg)
-    segs = [
-        Segment(
-            start=0.0,
-            end=2.0,
-            original="Hi",
-            translated="Привет",
-            audio_path="/tmp/x.wav",
-            audio_duration=2.5,  # > duration=2.0 but < gap=3.0
-        ),
-        Segment(
-            start=3.0,
-            end=4.0,
-            original="Bye",
-            translated="Пока",
-            audio_path="/tmp/y.wav",
-            audio_duration=0.5,
-        ),
-    ]
+def test_merge_audio_delayed_to_shifted_offset(mock_ffmpeg):
+    # seg0 slowed to target 2.4 → seg1 adelay must reflect new_start=2400ms, not original 2000ms
+    audio_chain, _ = _setup(mock_ffmpeg, video_total=4.0)
+    segs = [_seg(0.0, 2.0, 3.0), _seg(2.0, 4.0, 1.0)]
     merge("/videos/test.mp4", segs, "_dubbed")
 
-    names = _filter_names(chain)
-    assert "atempo" not in names
-    assert "atrim" not in names
-
-
-@patch("merge.ffmpeg")
-def test_merge_last_segment_plays_through_unstretched(mock_ffmpeg):
-    """Last segment has no successor — overflow plays out, no truncation."""
-    chain = _setup(mock_ffmpeg)
-    segs = [
-        Segment(
-            start=0.0,
-            end=2.0,
-            original="Hi",
-            translated="Привет",
-            audio_path="/tmp/x.wav",
-            audio_duration=10.0,
-        ),
-    ]
-    merge("/videos/test.mp4", segs, "_dubbed")
-
-    names = _filter_names(chain)
-    assert "atempo" not in names
-    assert "atrim" not in names
+    adelay_calls = [c for c in audio_chain.filter.call_args_list if c.args[0] == "adelay"]
+    expected_ms = int((3.0 / AUDIO_SOFT) * 1000)  # 2400
+    assert any(f"{expected_ms}|{expected_ms}" == c.args[1] for c in adelay_calls)
 
 
 def test_plan_segment_fits_natural():
