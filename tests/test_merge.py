@@ -1,6 +1,12 @@
 from unittest.mock import MagicMock, patch
 
-from merge import merge
+from merge import (
+    ATEMPO_MAX,
+    AUDIO_SOFT,
+    VIDEO_MIN,
+    _plan_segment,
+    merge,
+)
 from segment import Segment
 
 
@@ -123,7 +129,7 @@ def test_merge_atempo_ratio_under_cap(mock_ffmpeg):
 
 @patch("merge.ffmpeg")
 def test_merge_atempo_clamped_to_upper(mock_ffmpeg):
-    """Regression guard: ATEMPO_MAX cap value (currently 1.5)."""
+    """Regression guard: ratio above ATEMPO_MAX is clamped to the cap."""
     chain = _setup(mock_ffmpeg)
     segs = [
         Segment(
@@ -147,7 +153,7 @@ def test_merge_atempo_clamped_to_upper(mock_ffmpeg):
 
     atempo_calls = [c for c in chain.filter.call_args_list if c.args[0] == "atempo"]
     assert len(atempo_calls) == 1
-    assert abs(atempo_calls[0].args[1] - 1.5) < 1e-6
+    assert abs(atempo_calls[0].args[1] - ATEMPO_MAX) < 1e-6
 
 
 @patch("merge.ffmpeg")
@@ -198,3 +204,51 @@ def test_merge_last_segment_plays_through_unstretched(mock_ffmpeg):
     names = _filter_names(chain)
     assert "atempo" not in names
     assert "atrim" not in names
+
+
+def test_plan_segment_fits_natural():
+    # audio shorter than window → no speedup, no slowdown
+    p = _plan_segment(a=1.5, w=2.0)
+    assert p.audio_tempo == 1.0
+    assert p.video_speed == 1.0
+    assert p.target_dur == 2.0
+    assert p.truncated == 0.0
+
+
+def test_plan_segment_soft_audio_only():
+    # a/w = 1.2 (< AUDIO_SOFT=1.25): soft speedup alone makes it fit, video untouched
+    p = _plan_segment(a=2.4, w=2.0)
+    assert abs(p.audio_tempo - 1.2) < 1e-6
+    assert p.video_speed == 1.0
+    assert p.target_dur == 2.0
+    assert p.truncated == 0.0
+
+
+def test_plan_segment_slows_video():
+    # a/w = 1.5 > AUDIO_SOFT: audio capped at 1.25, video slowed to fit, no truncation
+    p = _plan_segment(a=3.0, w=2.0)
+    assert abs(p.audio_tempo - AUDIO_SOFT) < 1e-6
+    needed = 3.0 / AUDIO_SOFT  # 2.4
+    assert abs(p.target_dur - needed) < 1e-6
+    assert abs(p.video_speed - 2.0 / needed) < 1e-6  # 0.8333
+    assert p.video_speed >= VIDEO_MIN
+    assert p.truncated == 0.0
+
+
+def test_plan_segment_hits_video_floor_then_hard_audio():
+    # huge deficit: video pinned at VIDEO_MIN floor, audio re-sped up to ATEMPO_MAX, tail trimmed
+    p = _plan_segment(a=10.0, w=2.0)
+    assert p.video_speed == VIDEO_MIN
+    target = 2.0 / VIDEO_MIN  # 4.0
+    assert abs(p.target_dur - target) < 1e-6
+    assert abs(p.audio_tempo - ATEMPO_MAX) < 1e-6
+    assert abs(p.truncated - (10.0 / ATEMPO_MAX - target)) < 1e-6  # > 0
+    assert p.truncated > 0
+
+
+def test_plan_segment_nonpositive_window_overflows():
+    # w <= 0 (overlapping/broken timings): target 0, no slowdown, audio overflows
+    p = _plan_segment(a=3.0, w=0.0)
+    assert p.target_dur == 0.0
+    assert p.video_speed == 1.0
+    assert p.audio_tempo == 1.0

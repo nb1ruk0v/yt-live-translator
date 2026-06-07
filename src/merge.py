@@ -1,10 +1,51 @@
+from dataclasses import dataclass
 from pathlib import Path
 
 import ffmpeg
 
 from segment import Segment
 
-ATEMPO_MAX = 1.5
+ATEMPO_MAX = 1.7  # hard atempo ceiling; pitch-preserving speedup, last resort in the cascade
+AUDIO_SOFT = 1.25  # soft atempo cap tried before slowing video
+VIDEO_MIN = 0.5  # slowest the window's video is allowed to play
+
+
+@dataclass
+class SegmentPlan:
+    audio_tempo: float  # atempo factor (>= 1.0)
+    video_speed: float  # playback speed of the window's video (<= 1.0 slows it)
+    target_dur: float  # wall-clock duration the window occupies in the output
+    new_start: float  # absolute start in the rebuilt timeline; set by plan_timeline
+    truncated: float  # seconds of audio dropped by the safety atrim
+
+
+def _plan_segment(a: float, w: float) -> SegmentPlan:
+    """Cascade for one window: soft audio speedup → slow video → hard audio → trim."""
+    if w <= 0:
+        # overlapping/broken timings: no video to slow, let audio overflow
+        return SegmentPlan(1.0, 1.0, 0.0, 0.0, 0.0)
+    if a <= w:
+        return SegmentPlan(1.0, 1.0, w, 0.0, 0.0)
+
+    tempo = min(AUDIO_SOFT, a / w)
+    needed = a / tempo
+    if needed <= w:
+        return SegmentPlan(tempo, 1.0, w, 0.0, 0.0)
+
+    vspeed = w / needed
+    if vspeed >= VIDEO_MIN:
+        return SegmentPlan(tempo, vspeed, needed, 0.0, 0.0)
+
+    # video pinned at the floor; re-speed audio as hard as allowed, trim the rest
+    target = w / VIDEO_MIN
+    tempo = min(ATEMPO_MAX, a / target)
+    truncated = max(0.0, a / tempo - target)
+    return SegmentPlan(tempo, VIDEO_MIN, target, 0.0, truncated)
+
+
+def plan_timeline(segments: list) -> list[SegmentPlan]:
+    """Placeholder — implemented in Task 2."""
+    raise NotImplementedError
 
 
 def merge(video_path: str, segments: list[Segment], suffix: str) -> str:
