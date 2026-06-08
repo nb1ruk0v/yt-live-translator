@@ -136,6 +136,10 @@ def merge(video_path: str, segments: list[Segment], suffix: str) -> str:
         video_out = ffmpeg.concat(*video_pieces, v=1, a=0)
 
     mixed = ffmpeg.filter(audio_streams, "amix", inputs=len(audio_streams), normalize=0)
+    # amix over many adelay'd streams can emit a corrupt/overflowing PTS that the mp4
+    # muxer rejects ("non-monotonic DTS ... INT64_MAX"). Regenerate clean, monotonic
+    # audio timestamps from the sample count before muxing.
+    mixed = mixed.filter("asetpts", "N/SR/TB")
     out = ffmpeg.output(video_out, mixed, str(output_path))
     out.overwrite_output().run(capture_stdout=True, capture_stderr=True)
     return str(output_path)

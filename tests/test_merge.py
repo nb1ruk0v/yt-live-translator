@@ -63,6 +63,19 @@ def test_merge_returns_output_path_with_suffix(mock_ffmpeg):
 
 
 @patch("merge.ffmpeg")
+def test_merge_regenerates_audio_pts_after_amix(mock_ffmpeg):
+    # amix over many adelay'd streams can emit a corrupt PTS the mp4 muxer rejects
+    # ("non-monotonic DTS ... INT64_MAX"). The mixed audio must be passed through
+    # asetpts=N/SR/TB to regenerate clean timestamps before muxing.
+    _setup(mock_ffmpeg)
+    merge("/videos/test.mp4", make_segments(), "_dubbed")
+    amix_out = mock_ffmpeg.filter.return_value  # ffmpeg.filter(..., "amix", ...) result
+    asetpts_calls = [c for c in amix_out.filter.call_args_list if c.args[0] == "asetpts"]
+    assert asetpts_calls, "mixed audio must be re-stamped with asetpts after amix"
+    assert asetpts_calls[0].args[1] == "N/SR/TB"
+
+
+@patch("merge.ffmpeg")
 def test_merge_no_filters_when_audio_fits_window(mock_ffmpeg):
     # video_total=20 → both segments' windows easily fit their audio
     audio_chain, _ = _setup(mock_ffmpeg, video_total=20.0)
