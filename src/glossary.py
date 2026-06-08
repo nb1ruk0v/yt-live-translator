@@ -17,6 +17,12 @@ SYSTEM_PROMPT = (
     "Output ONLY the Markdown, no preamble, no code fences."
 )
 
+# A full transcript (~5k tokens for a 20-min talk) overflows Ollama's default 4k
+# context, so the model never sees the end and the glossary gets cut off mid-table.
+# 16k leaves generous headroom; num_predict bounds the output so it can't run away.
+NUM_CTX = 16384
+NUM_PREDICT = 2048
+
 
 def build_glossary(segments: list[Segment], config: dict, out_path: str) -> str:
     text = "\n".join(s.original.strip() for s in segments if s.original.strip())
@@ -33,17 +39,33 @@ def build_glossary(segments: list[Segment], config: dict, out_path: str) -> str:
                     {"role": "user", "content": text},
                 ],
                 "stream": False,
-                "options": {"temperature": 0, "num_predict": 1024},
+                "options": {"temperature": 0, "num_ctx": NUM_CTX, "num_predict": NUM_PREDICT},
             },
             timeout=600,
         )
         response.raise_for_status()
-        md = response.json()["message"]["content"].strip()
+        data = response.json()
+        md = data["message"]["content"].strip()
     except Exception as e:  # noqa: BLE001 — pipeline must not die on glossary
         print(
             f"[glossary] warning: build failed ({e}); continuing without context", file=sys.stderr
         )
         return ""
+
+    # Token accounting so transcript/glossary overflow can't slip by unnoticed.
+    in_tok = data.get("prompt_eval_count")
+    out_tok = data.get("eval_count")
+    print(f"[glossary] tokens: input {in_tok}/{NUM_CTX}, output {out_tok}/{NUM_PREDICT}")
+    if out_tok is not None and out_tok >= NUM_PREDICT:
+        print(
+            "[glossary] WARNING: output hit num_predict cap — glossary likely truncated",
+            file=sys.stderr,
+        )
+    if in_tok is not None and in_tok >= NUM_CTX:
+        print(
+            "[glossary] WARNING: input filled num_ctx — transcript likely truncated",
+            file=sys.stderr,
+        )
 
     try:
         with open(out_path, "w", encoding="utf-8") as f:

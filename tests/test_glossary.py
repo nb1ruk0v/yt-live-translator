@@ -55,7 +55,38 @@ def test_build_glossary_hits_chat_endpoint_with_config_model(mock_post, tmp_path
 
     assert mock_post.call_args[0][0].endswith("/api/chat")
     assert mock_post.call_args[1]["json"]["model"] == "mistral:7b"
-    assert mock_post.call_args[1]["json"]["options"]["temperature"] == 0
+    opts = mock_post.call_args[1]["json"]["options"]
+    assert opts["temperature"] == 0
+    # full transcript must fit the context and the glossary must not be capped mid-table
+    assert opts["num_ctx"] == 16384
+    assert opts["num_predict"] == 2048
+
+
+@patch("glossary.requests.post")
+def test_build_glossary_reports_token_counts(mock_post, tmp_path, capsys):
+    mock_post.return_value = MagicMock(
+        status_code=200,
+        json=lambda: {"message": {"content": MD}, "prompt_eval_count": 4500, "eval_count": 800},
+    )
+    build_glossary(
+        [Segment(start=0.0, end=1.0, original="Test")], FAKE_CONFIG, str(tmp_path / "g.md")
+    )
+    out = capsys.readouterr().out
+    assert "input 4500/16384" in out
+    assert "output 800/2048" in out
+
+
+@patch("glossary.requests.post")
+def test_build_glossary_warns_when_output_capped(mock_post, tmp_path, capsys):
+    # eval_count == num_predict means the glossary was cut off — must surface a warning
+    mock_post.return_value = MagicMock(
+        status_code=200,
+        json=lambda: {"message": {"content": MD}, "prompt_eval_count": 100, "eval_count": 2048},
+    )
+    build_glossary(
+        [Segment(start=0.0, end=1.0, original="Test")], FAKE_CONFIG, str(tmp_path / "g.md")
+    )
+    assert "num_predict cap" in capsys.readouterr().err
 
 
 def test_build_glossary_empty_segments_returns_empty(tmp_path):
